@@ -79,6 +79,7 @@ class HandProcessor(object):
 class HandProcessorSingleImage(HandProcessor):
     def __init__(self):
         self.original = cv2.imread('oneHand.jpg')
+        self.drawingCanvas = np.zeros(self.original.shape, np.uint8)
 
     def process(self):
         self.boostContrast = HandProcessor.boostContrast(self.original)
@@ -105,14 +106,43 @@ class HandProcessorSingleImage(HandProcessor):
             return (self.largestContour[index][0][0], self.largestContour[index][0][1])
         return None
 
+    def drawHandContour(self, bubbles = False):
+        cv2.drawContours(self.drawingCanvas, [self.largestContour], 0, (0, 255, 0), 1)
+        if bubbles:
+            self.drawBubbles(self.largestContour, (255, 255, 0))
+            # for i in xrange(len(self.largestContour)):
+            #     for j in xrange(len(self.largestContour[i])):
+            #         cv2.circle(self.contourCanvas, (self.largestContour[i][j][0], self.largestContour[i][j][1]), 2, (255, 255, 0))
+
+    def drawHullContour(self, bubbles = False):
+        hullPoints = []
+        for i in self.hullLargestContour:
+            hullPoints.append(self.largestContour[i[0]])
+        hullPoints = np.array(hullPoints, dtype = np.int32)
+        cv2.drawContours(self.drawingCanvas, [hullPoints], 0, (0, 0, 255), 2)
+        if bubbles:
+            self.drawBubbles(hullPoints, (255, 255, 255))
+
+    def drawDefects(self, bubbles = False):
+        defectPoints = []
+        minDistance = 1000
+        for i in self.defects:
+            if i[0][3] > minDistance:
+                defectPoints.append(self.largestContour[i[0][2]])
+        defectPoints = np.array(defectPoints, dtype = np.int32)
+        # cv2.drawContours(self.drawingCanvas, [defectPoints], 0, (255, 255, 255), 2)
+        if bubbles:
+            self.drawBubbles(defectPoints, (0, 0, 255), width = 4)
+
+    def drawBubbles(self, pointsList, color = (255, 255, 255), width = 2):
+        for i in xrange(len(pointsList)):
+            for j in xrange(len(pointsList[i])):
+                cv2.circle(self.drawingCanvas, (pointsList[i][j][0], pointsList[i][j][1]), width, color)        
+
     def draw(self):
-        super(HandProcessorSingleImage, self).draw()
-        # for i in xrange(len(self.hullLargestContour)):
-        #     print i, self.hullLargestContour[i], self.largestContour[self.hullLargestContour[i]]
-        # print self.defects
-        for i in xrange(len(self.defects)):
-            # print self.defects[i][0][0]
-            cv2.circle(self.contourCanvas, self.getPoint(self.defects[i][0][3]), 10, (0, 0, 255))
-        cv2.imshow('LargestContour', self.contourCanvas)
+        self.drawHandContour(True)
+        self.drawHullContour(True)
+        self.drawDefects(True)
+        cv2.imshow('LargestContour', self.drawingCanvas)
 
 HandProcessorSingleImage().process()
