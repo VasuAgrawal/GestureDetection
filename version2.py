@@ -44,22 +44,17 @@ class HandProcessor(object):
                 maxArea = area
                 index = i
         self.largestContour = self.contours[index]
-        self.hullLargestContour = cv2.convexHull(self.largestContour)
+        # self.hullLargestContour = cv2.convexHull(self.largestContour)
+        self.hullLargestContour = cv2.convexHull(self.largestContour, returnPoints = False)
+        self.defects = cv2.convexityDefects(self.largestContour, self.hullLargestContour)
 
 
     def draw(self):
-        cv2.imshow('Original Image', self.original)
-        cv2.imshow('Thresholded', self.thresholded)
-        self.contourCanvas = np.zeros(self.original.shape, np.uint8)
-        cv2.drawContours(self.contourCanvas, [self.largestContour], 0, (0, 255, 0), 1)
-        # cv2.drawContours(self.contourCanvas, [self.hullLargestContour], 0, (0, 0, 255), 2)
-        # for i in xrange(len(self.hullLargestContour)):
-        #     for j in xrange(len(self.hullLargestContour[i])):
-        #         cv2.circle(self.contourCanvas, (self.hullLargestContour[i][j][0], self.hullLargestContour[i][j][1]), 5, (255, 0, 0))
-        for i in xrange(len(self.largestContour)):
-            for j in xrange(len(self.largestContour[i])):
-                cv2.circle(self.contourCanvas, (self.largestContour[i][j][0], self.largestContour[i][j][1]), 2, (255, 255, 0))
-        # cv2.imshow('Largest Contour', self.contourCanvas)
+        self.drawingCanvas = np.zeros(self.original.shape, np.uint8)
+        self.drawHandContour(True)
+        self.drawHullContour(True)
+        self.drawDefects(True)
+        cv2.imshow('LargestContour', self.drawingCanvas)
 
     def process(self):
         while (self.cap.isOpened()):
@@ -73,33 +68,6 @@ class HandProcessor(object):
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         self.close()
- 
-# HandProcessor().process()
-
-class HandProcessorSingleImage(HandProcessor):
-    def __init__(self):
-        self.original = cv2.imread('oneHand.jpg')
-        self.drawingCanvas = np.zeros(self.original.shape, np.uint8)
-
-    def process(self):
-        self.boostContrast = HandProcessor.boostContrast(self.original)
-        self.thresholded = HandProcessor.threshold(self.boostContrast)
-        self.setContours(self.thresholded.copy())
-        self.findLargestContour()
-        self.draw()
-        if cv2.waitKey(0) & 0xFF == ord('q'):
-            self.close()
-
-    def findLargestContour(self):
-        super(HandProcessorSingleImage, self).findLargestContour()
-        # Returns indices in self.largestContour instead of points
-        self.hullLargestContour = cv2.convexHull(self.largestContour, returnPoints = False)
-        # start point, end point, farthest point are all indices in self.largestContour
-        # [start point, end point, farthest point, distance to farthest point]
-        self.defects = cv2.convexityDefects(self.largestContour, self.hullLargestContour)
-
-    def close(self):
-        cv2.destroyAllWindows()
 
     def getPoint(self, index):
         if index < len(self.largestContour):
@@ -110,9 +78,6 @@ class HandProcessorSingleImage(HandProcessor):
         cv2.drawContours(self.drawingCanvas, [self.largestContour], 0, (0, 255, 0), 1)
         if bubbles:
             self.drawBubbles(self.largestContour, (255, 255, 0))
-            # for i in xrange(len(self.largestContour)):
-            #     for j in xrange(len(self.largestContour[i])):
-            #         cv2.circle(self.contourCanvas, (self.largestContour[i][j][0], self.largestContour[i][j][1]), 2, (255, 255, 0))
 
     def drawHullContour(self, bubbles = False):
         hullPoints = []
@@ -130,19 +95,37 @@ class HandProcessorSingleImage(HandProcessor):
             if i[0][3] > minDistance:
                 defectPoints.append(self.largestContour[i[0][2]])
         defectPoints = np.array(defectPoints, dtype = np.int32)
-        # cv2.drawContours(self.drawingCanvas, [defectPoints], 0, (255, 255, 255), 2)
         if bubbles:
             self.drawBubbles(defectPoints, (0, 0, 255), width = 4)
 
     def drawBubbles(self, pointsList, color = (255, 255, 255), width = 2):
         for i in xrange(len(pointsList)):
             for j in xrange(len(pointsList[i])):
-                cv2.circle(self.drawingCanvas, (pointsList[i][j][0], pointsList[i][j][1]), width, color)        
+                cv2.circle(self.drawingCanvas, (pointsList[i][j][0], pointsList[i][j][1]), width, color)
+
+HandProcessor().process()
+
+class HandProcessorSingleImage(HandProcessor):
+    def __init__(self):
+        self.original = cv2.imread('oneHand.jpg')
+
+    def process(self):
+        self.boostContrast = HandProcessor.boostContrast(self.original)
+        self.thresholded = HandProcessor.threshold(self.boostContrast)
+        self.setContours(self.thresholded.copy())
+        self.findLargestContour()
+        self.draw()
+        if cv2.waitKey(0) & 0xFF == ord('q'):
+            self.close()
+
+    def close(self):
+        cv2.destroyAllWindows()
 
     def draw(self):
+        self.drawingCanvas = np.zeros(self.original.shape, np.uint8)
         self.drawHandContour(True)
         self.drawHullContour(True)
         self.drawDefects(True)
         cv2.imshow('LargestContour', self.drawingCanvas)
 
-HandProcessorSingleImage().process()
+# HandProcessorSingleImage().process()
