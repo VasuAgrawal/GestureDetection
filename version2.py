@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import time
 
 class HandProcessor(object):
     def __init__(self):
@@ -9,6 +10,10 @@ class HandProcessor(object):
         self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, self.cameraWidth)
         self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, self.cameraHeight)
         self.handCenterPositions = []
+        self.stationary = False
+        self.record = False
+        self.endGesture = False
+        self.gesturePoints = []
 
     def close(self):
         self.cap.release()
@@ -53,6 +58,9 @@ class HandProcessor(object):
         self.handXCenterMoment = int(self.handMoments["m10"]/self.handMoments["m00"])
         self.handYCenterMoment = int(self.handMoments["m01"]/self.handMoments["m00"])
         self.handCenterPositions += [(self.handXCenterMoment, self.handYCenterMoment)]
+        if len(self.handCenterPositions) > 10:
+            self.canDoGestures = True
+        else: self.canDoGestures = False
 
     def analyzeHandCenter(self):
         # makes sure that there is actually sufficient data to trace over
@@ -61,7 +69,7 @@ class HandProcessor(object):
             self.x = [pos[0] for pos in self.recentPositions]
             self.y = [pos[1] for pos in self.recentPositions]
             self.poly = np.polyfit(self.x, self.y, 1)
-            print self.poly
+            # print self.poly
         else:
             self.recentPositions = []
 
@@ -87,7 +95,46 @@ class HandProcessor(object):
         # print rect
 
     def drawBoundingBox(self):
-        pass    
+        pass
+
+    def determineIfGesture(self):
+        self.prevRecordState = self.record
+        self.detemineStationary()
+        if self.record:
+            self.gesturePoints += [self.handCenterPositions[-1]]
+        elif self.prevRecordState == True and not self.record:
+            if len(self.gesturePoints) > 3:
+                print "Gesture:", self.gesturePoints
+            self.gesturePoints = []
+
+
+    def detemineStationary(self):
+        # Figure out of the past few points have been at roughly the same position
+        # If they have and there is suddenly movement, trigger the start of a gesture search
+        searchLength = 3 # 3 frames should be enough
+        val = -1 * (searchLength + 1)
+        if self.canDoGestures:
+            xPoints = [pt[0] for pt in self.handCenterPositions[val:-1]]
+            yPoints = [pt[1] for pt in self.handCenterPositions[val:-1]]
+            xAvg = np.average(xPoints)
+            yAvg = np.average(yPoints)
+            factor = 0.04
+            for x, y in self.handCenterPositions[-(searchLength + 1):-1]:
+                # if any point is further further from the average:
+                if (x - xAvg) ** 2 + (y - yAvg) ** 2 > factor * min(self.cameraWidth, self.cameraHeight):
+                    # If previous not moving, start recording
+                    if self.stationary:
+                        self.record = True
+                        print "Starting Gesture!"
+                    self.stationary = False
+                    self.stationaryTimeStart = time.time()
+                    return
+            # Not previously stationary but stationary now
+            if not self.stationary:
+                self.record = False
+                print "Ending Gesture!"
+            self.stationary = True
+            # print "Stationary!"
 
     def printValues(self):
         print "Hand Contour:"
@@ -109,6 +156,7 @@ class HandProcessor(object):
             self.findHandContour()
             self.setHandDimensions()
             self.analyzeHandCenter()
+            self.determineIfGesture()
             # self.printValues()
             # break
             self.draw()
