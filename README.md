@@ -7,7 +7,7 @@ Currently works best in low lighting.
 
 Yet to be implemented:
 
-~ Gesture determination
-~ Gesture training
-~ Better hand/center detection
-~ Finger detection
+Gesture determination
+Gesture training
+Better hand/center detection
+Finger detection
