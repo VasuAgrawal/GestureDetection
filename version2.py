@@ -8,6 +8,7 @@ class HandProcessor(object):
         self.cameraHeight = 1080
         self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, self.cameraWidth)
         self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, self.cameraHeight)
+        self.handCenterPositions = []
 
     def close(self):
         self.cap.release()
@@ -34,27 +35,69 @@ class HandProcessor(object):
     def setContours(self, img):
         self.contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
+    # Currently just finds the largest contour, which seems to work to some degree
     # Should be able to replace this with a "matching" algorithm instead, from here:
     # http://docs.opencv.org/trunk/doc/py_tutorials/py_imgproc/py_contours/py_contours_more_functions/py_contours_more_functions.html
-    def findLargestContour(self):
+    def findHandContour(self):
         maxArea, index = 0, 0
         for i in xrange(len(self.contours)):
             area = cv2.contourArea(self.contours[i])
             if area > maxArea:
                 maxArea = area
                 index = i
-        self.largestContour = self.contours[index]
-        # self.hullLargestContour = cv2.convexHull(self.largestContour)
-        self.hullLargestContour = cv2.convexHull(self.largestContour, returnPoints = False)
-        self.defects = cv2.convexityDefects(self.largestContour, self.hullLargestContour)
+        self.handContour = self.contours[index]
+        # self.hullHandContour = cv2.convexHull(self.handContour)
+        self.hullHandContour = cv2.convexHull(self.handContour, returnPoints = False)
+        self.defects = cv2.convexityDefects(self.handContour, self.hullHandContour)
+        self.handMoments = cv2.moments(self.handContour)
+        self.handXCenterMoment = int(self.handMoments["m10"]/self.handMoments["m00"])
+        self.handYCenterMoment = int(self.handMoments["m01"]/self.handMoments["m00"])
+        self.handCenterPositions += [(self.handXCenterMoment, self.handYCenterMoment)]
 
+    def analyzeHandCenter(self):
+        # makes sure that there is actually sufficient data to trace over
+        if len(self.handCenterPositions) > 10:
+            self.recentPositions = sorted(self.handCenterPositions[-30:])
+            self.x = [pos[0] for pos in self.recentPositions]
+            self.y = [pos[1] for pos in self.recentPositions]
+            self.poly = np.polyfit(self.x, self.y, 1)
+            print self.poly
+        else:
+            self.recentPositions = []
+
+    # def testVerticalLinearity(self):
+
+
+    def drawCenter(self):
+        cv2.circle(self.drawingCanvas, (self.handXCenterMoment, self.handYCenterMoment), 10, (255, 255, 255), -2)
+        if len(self.recentPositions) != 0:
+            for i in xrange(len(self.recentPositions)):
+                cv2.circle(self.drawingCanvas, self.recentPositions[i], 5, (255, 25*i, 25*i), -1)
 
     def draw(self):
         self.drawingCanvas = np.zeros(self.original.shape, np.uint8)
         self.drawHandContour(True)
         self.drawHullContour(True)
         self.drawDefects(True)
-        cv2.imshow('LargestContour', self.drawingCanvas)
+        self.drawCenter()
+        cv2.imshow('HandContour', self.drawingCanvas)
+
+    def setHandDimensions(self):
+        rect = cv2.minAreaRect(self.handContour)
+        # print rect
+
+    def drawBoundingBox(self):
+        pass    
+
+    def printValues(self):
+        print "Hand Contour:"
+        print self.handContour
+        print
+        print "Hull Point Indices:"
+        print self.hullHandContour
+        print 
+        print "Defects:"
+        print self.defects
 
     def process(self):
         while (self.cap.isOpened()):
@@ -63,26 +106,30 @@ class HandProcessor(object):
             self.boostContrast = HandProcessor.boostContrast(self.original)
             self.thresholded = HandProcessor.threshold(self.boostContrast)
             self.setContours(self.thresholded.copy())
-            self.findLargestContour()
+            self.findHandContour()
+            self.setHandDimensions()
+            self.analyzeHandCenter()
+            # self.printValues()
+            # break
             self.draw()
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         self.close()
 
     def getPoint(self, index):
-        if index < len(self.largestContour):
-            return (self.largestContour[index][0][0], self.largestContour[index][0][1])
+        if index < len(self.handContour):
+            return (self.handContour[index][0][0], self.handContour[index][0][1])
         return None
 
     def drawHandContour(self, bubbles = False):
-        cv2.drawContours(self.drawingCanvas, [self.largestContour], 0, (0, 255, 0), 1)
+        cv2.drawContours(self.drawingCanvas, [self.handContour], 0, (0, 255, 0), 1)
         if bubbles:
-            self.drawBubbles(self.largestContour, (255, 255, 0))
+            self.drawBubbles(self.handContour, (255, 255, 0))
 
     def drawHullContour(self, bubbles = False):
         hullPoints = []
-        for i in self.hullLargestContour:
-            hullPoints.append(self.largestContour[i[0]])
+        for i in self.hullHandContour:
+            hullPoints.append(self.handContour[i[0]])
         hullPoints = np.array(hullPoints, dtype = np.int32)
         cv2.drawContours(self.drawingCanvas, [hullPoints], 0, (0, 0, 255), 2)
         if bubbles:
@@ -93,7 +140,7 @@ class HandProcessor(object):
         minDistance = 1000
         for i in self.defects:
             if i[0][3] > minDistance:
-                defectPoints.append(self.largestContour[i[0][2]])
+                defectPoints.append(self.handContour[i[0][2]])
         defectPoints = np.array(defectPoints, dtype = np.int32)
         if bubbles:
             self.drawBubbles(defectPoints, (0, 0, 255), width = 4)
@@ -113,7 +160,7 @@ class HandProcessorSingleImage(HandProcessor):
         self.boostContrast = HandProcessor.boostContrast(self.original)
         self.thresholded = HandProcessor.threshold(self.boostContrast)
         self.setContours(self.thresholded.copy())
-        self.findLargestContour()
+        self.findHandContour()
         self.draw()
         if cv2.waitKey(0) & 0xFF == ord('q'):
             self.close()
@@ -126,6 +173,6 @@ class HandProcessorSingleImage(HandProcessor):
         self.drawHandContour(True)
         self.drawHullContour(True)
         self.drawDefects(True)
-        cv2.imshow('LargestContour', self.drawingCanvas)
+        cv2.imshow('HandContour', self.drawingCanvas)
 
 # HandProcessorSingleImage().process()
