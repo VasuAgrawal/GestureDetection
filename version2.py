@@ -2,6 +2,37 @@ import cv2
 import numpy as np
 import time
 
+class GestureTemplate(object):
+    def __init__(self, points):
+        self.points = np.array(points, dtype = np.float)
+        self.points = GestureTemplate.normalizePoints(self.points)
+        self.templateDistance = GestureTemplate.distance(self.points)
+
+    @staticmethod
+    def distance(points):
+        distance = 0
+        for i in xrange(len(points)-1):
+            distance += (abs(points[i][0] - points[i+1][0]) ** 2 + abs(points[i][1] - points[i+1][1]) ** 2) ** 0.5
+        return distance
+
+    @staticmethod
+    def normalizePoints(points):
+        return points - points[0]
+
+    def compareGesture(self, gesturePoints):
+        # First scale the input gesture based on the distance between points
+        gesturePoints = np.array(gesturePoints, dtype = float)
+        gesturePoints = GestureTemplate.normalizePoints(gesturePoints)
+        print "Normalized Gesture Points:", gesturePoints
+        gestureDistance = GestureTemplate.distance(gesturePoints)
+        scaleFactor = self.templateDistance / gestureDistance
+        gesturePoints *= scaleFactor
+        print "Template:", self.points
+        print "Template Distance:", self.templateDistance
+        print "Gesture Distance:", gestureDistance
+        print "Scale Factor:", scaleFactor
+        print "Adjusted Gesture Points:", gesturePoints
+
 class HandProcessor(object):
     def __init__(self):
         self.cap = cv2.VideoCapture(0)
@@ -14,6 +45,7 @@ class HandProcessor(object):
         self.record = False
         self.endGesture = False
         self.gesturePoints = []
+        self.lineTemplate = GestureTemplate([(x, 0) for x in xrange(20)])
 
     def close(self):
         self.cap.release()
@@ -105,7 +137,11 @@ class HandProcessor(object):
         elif self.prevRecordState == True and not self.record:
             if len(self.gesturePoints) > 3:
                 print "Gesture:", self.gesturePoints
+                self.classifyGesture()
             self.gesturePoints = []
+
+    def classifyGesture(self):
+        self.lineTemplate.compareGesture(self.gesturePoints)
 
 
     def detemineStationary(self):
@@ -224,3 +260,7 @@ class HandProcessorSingleImage(HandProcessor):
         cv2.imshow('HandContour', self.drawingCanvas)
 
 # HandProcessorSingleImage().process()
+
+# lineTemplate = GestureTemplate([(x, 0) for x in xrange(21)])
+# print GestureTemplate.distance([(0, 0), (100, 0), (200, 0)])
+# print lineTemplate.compareGesture([(0, 0), (100, 0), (200, 0)])
