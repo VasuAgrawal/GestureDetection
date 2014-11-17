@@ -1,15 +1,17 @@
 import cv2
 import numpy as np
 import time
+import math
 
 class GestureTemplate(object):
-    def __init__(self, points):
+    def __init__(self, points, name = ""):
         self.points = np.array(points, dtype = np.float)
         self.points = GestureTemplate.normalizePoints(self.points)
-        self.templateDistance = GestureTemplate.distance(self.points)
+        self.templateDistance = GestureTemplate.curveDistance(self.points)
+        self.name = name
 
     @staticmethod
-    def distance(points):
+    def curveDistance(points):
         distance = 0
         for i in xrange(len(points)-1):
             distance += (abs(points[i][0] - points[i+1][0]) ** 2 + abs(points[i][1] - points[i+1][1]) ** 2) ** 0.5
@@ -21,17 +23,33 @@ class GestureTemplate(object):
 
     def compareGesture(self, gesturePoints):
         # First scale the input gesture based on the distance between points
+        gesturePoints = gesturePoints[:-2]
         gesturePoints = np.array(gesturePoints, dtype = float)
         gesturePoints = GestureTemplate.normalizePoints(gesturePoints)
-        print "Normalized Gesture Points:", gesturePoints
-        gestureDistance = GestureTemplate.distance(gesturePoints)
+        # print "Normalized Gesture Points:", gesturePoints
+        gestureDistance = GestureTemplate.curveDistance(gesturePoints)
         scaleFactor = self.templateDistance / gestureDistance
         gesturePoints *= scaleFactor
-        print "Template:", self.points
-        print "Template Distance:", self.templateDistance
-        print "Gesture Distance:", gestureDistance
-        print "Scale Factor:", scaleFactor
-        print "Adjusted Gesture Points:", gesturePoints
+        # print "Template:", self.points
+        # print "Template Distance:", self.templateDistance
+        # print "Gesture Distance:", gestureDistance
+        # print "Scale Factor:", scaleFactor
+        # print "Adjusted Gesture Points:", gesturePoints
+        # Both the template and the gesture will have (0, 0) for their start point
+        # so that can be safely ignored
+        # Directly map the indices of the gesture to the template
+        totalError = 0
+        for i in xrange(0, len(gesturePoints)):
+            selfIndex = int(i * (len(self.points) - 1) / float((len(gesturePoints) -1)))
+            # print i, self.points[selfIndex], gesturePoints[i]
+            totalError += GestureTemplate.error(self.points[selfIndex], gesturePoints[i])
+        # print totalDistanceDiff
+        # print totalDistanceDiff/self.templateDistance
+        return totalError/self.templateDistance
+
+    @staticmethod
+    def error(point1, point2):
+        return ((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
 
 class HandProcessor(object):
     def __init__(self):
@@ -45,7 +63,19 @@ class HandProcessor(object):
         self.record = False
         self.endGesture = False
         self.gesturePoints = []
-        self.lineTemplate = GestureTemplate([(x, 0) for x in xrange(20)])
+        self.initGestureTemplates()
+        
+    def initGestureTemplates(self):
+        self.gestureTemplates = []
+        hLineLR = GestureTemplate([(-x, 0) for x in xrange(100)],
+            name="Horizontal Line Right to Left")
+        self.gestureTemplates.append(hLineLR)
+        hLineRL = GestureTemplate([(x, 0) for x in xrange(100)],
+            name="Horizontal Line Left to Right")
+        self.gestureTemplates.append(hLineRL)
+        # let's try something more complicated, like a circle:
+        circlePoints = [(10*math.cos(t), 10*math.sin(t)) for t in np.linspace(0, 2*math.pi, num=100)]
+        ccwCircle = GestureTemplate(circlePoints, name="CCW Circle")
 
     def close(self):
         self.cap.release()
@@ -105,9 +135,6 @@ class HandProcessor(object):
         else:
             self.recentPositions = []
 
-    # def testVerticalLinearity(self):
-
-
     def drawCenter(self):
         cv2.circle(self.drawingCanvas, (self.handXCenterMoment, self.handYCenterMoment), 10, (255, 255, 255), -2)
         if len(self.recentPositions) != 0:
@@ -120,14 +147,13 @@ class HandProcessor(object):
         self.drawHullContour(True)
         self.drawDefects(True)
         self.drawCenter()
+        cv2.circle(self.drawingCanvas, (0, 0), 30, (255, 255, 255), -1)
+        cv2.circle(self.drawingCanvas, (500, 0), 30, (0, 255, 255), -1)
         cv2.imshow('HandContour', self.drawingCanvas)
+
 
     def setHandDimensions(self):
         rect = cv2.minAreaRect(self.handContour)
-        # print rect
-
-    def drawBoundingBox(self):
-        pass
 
     def determineIfGesture(self):
         self.prevRecordState = self.record
@@ -135,14 +161,21 @@ class HandProcessor(object):
         if self.record:
             self.gesturePoints += [self.handCenterPositions[-1]]
         elif self.prevRecordState == True and not self.record:
-            if len(self.gesturePoints) > 3:
-                print "Gesture:", self.gesturePoints
+            minGesturePoints = 5 # Should last a few frames at least
+            if len(self.gesturePoints) > 5:
+                # print "Gesture:", self.gesturePoints
                 self.classifyGesture()
             self.gesturePoints = []
 
     def classifyGesture(self):
-        self.lineTemplate.compareGesture(self.gesturePoints)
-
+        minError = 2*31 - 1 # a large value
+        minErrorIndex = -1
+        for i in xrange(len(self.gestureTemplates)):
+            error = self.gestureTemplates[i].compareGesture(self.gesturePoints) 
+            if error < minError:
+                minError = error
+                minErrorIndex = i
+        print self.gestureTemplates[minErrorIndex].name
 
     def detemineStationary(self):
         # Figure out of the past few points have been at roughly the same position
@@ -161,14 +194,14 @@ class HandProcessor(object):
                     # If previous not moving, start recording
                     if self.stationary:
                         self.record = True
-                        print "Starting Gesture!"
+                        # print "Starting Gesture!"
                     self.stationary = False
                     self.stationaryTimeStart = time.time()
                     return
             # Not previously stationary but stationary now
             if not self.stationary:
                 self.record = False
-                print "Ending Gesture!"
+                # print "Ending Gesture!"
             self.stationary = True
             # print "Stationary!"
 
@@ -262,5 +295,5 @@ class HandProcessorSingleImage(HandProcessor):
 # HandProcessorSingleImage().process()
 
 # lineTemplate = GestureTemplate([(x, 0) for x in xrange(21)])
-# print GestureTemplate.distance([(0, 0), (100, 0), (200, 0)])
+# print GestureTemplate.curveDistance([(0, 0), (100, 0), (200, 0)])
 # print lineTemplate.compareGesture([(0, 0), (100, 0), (200, 0)])
