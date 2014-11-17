@@ -76,6 +76,7 @@ class HandProcessor(object):
         # let's try something more complicated, like a circle:
         circlePoints = [(10*math.cos(t), 10*math.sin(t)) for t in np.linspace(0, 2*math.pi, num=100)]
         ccwCircle = GestureTemplate(circlePoints, name="CCW Circle")
+        self.gestureTemplates.append(ccwCircle)
 
     def close(self):
         self.cap.release()
@@ -172,6 +173,7 @@ class HandProcessor(object):
         minErrorIndex = -1
         for i in xrange(len(self.gestureTemplates)):
             error = self.gestureTemplates[i].compareGesture(self.gesturePoints) 
+            print self.gestureTemplates[i].name, "Error:", error
             if error < minError:
                 minError = error
                 minErrorIndex = i
