@@ -2,16 +2,24 @@ import cv2
 import numpy as np
 import time
 import math
+import sys
 
 class GestureTemplate(object):
+    __GestureMaxDim = 1024.0 # Nice round number
+
     def __init__(self, points, name = ""):
         self.points = np.array(points, dtype = np.float)
         self.points = GestureTemplate.normalizePoints(self.points)
-        self.templateDistance = GestureTemplate.curveDistance(self.points)
+        scaleFactor = GestureTemplate.__GestureMaxDim / GestureTemplate.maxDim(self.points)["maxDim"]
+        self.points *= scaleFactor
+        self.templateDistance = GestureTemplate.curveLength(self.points)
+        self.templateDistance, self.distanceIndices = GestureTemplate.curveLengthWithCumulativeDistanceIndices(self.points)
         self.name = name
+        print self.name
+        print self.distanceIndices
 
     @staticmethod
-    def curveDistance(points):
+    def curveLength(points):
         distance = 0
         for i in xrange(len(points)-1):
             distance += (abs(points[i][0] - points[i+1][0]) ** 2 + abs(points[i][1] - points[i+1][1]) ** 2) ** 0.5
@@ -27,7 +35,7 @@ class GestureTemplate(object):
         gesturePoints = np.array(gesturePoints, dtype = float)
         gesturePoints = GestureTemplate.normalizePoints(gesturePoints)
         # print "Normalized Gesture Points:", gesturePoints
-        gestureDistance = GestureTemplate.curveDistance(gesturePoints)
+        gestureDistance = GestureTemplate.curveLength(gesturePoints)
         scaleFactor = self.templateDistance / gestureDistance
         gesturePoints *= scaleFactor
         # print "Template:", self.points
@@ -39,13 +47,85 @@ class GestureTemplate(object):
         # so that can be safely ignored
         # Directly map the indices of the gesture to the template
         totalError = 0
-        for i in xrange(0, len(gesturePoints)):
+        for i in xrange(1, len(gesturePoints)):
             selfIndex = int(i * (len(self.points) - 1) / float((len(gesturePoints) -1)))
             # print i, self.points[selfIndex], gesturePoints[i]
             totalError += GestureTemplate.error(self.points[selfIndex], gesturePoints[i])
-        # print totalDistanceDiff
-        # print totalDistanceDiff/self.templateDistance
-        return totalError/self.templateDistance
+        # print totalError
+        # print totalError/gestureDistance
+        return totalError/gestureDistance
+
+    @staticmethod
+    def maxDim(points):
+        xMin, xMax, yMin, yMax = sys.maxsize, -sys.maxsize, sys.maxsize, -sys.maxsize
+        for x, y in points:
+            if x < xMin: xMin = x
+            if x > xMax: xMax = x
+            if y < yMin: yMin = y
+            if y > yMin: yMax = y
+        return {"xMin":xMin, "xMax":xMax, "yMin":yMin, "yMax":yMax,
+                "maxDim": max(yMax-yMin, xMax-xMin)}
+
+    def compareGestureMaxDim(self, gesturePoints):
+        # Rip off the last couple points from gesture due to how we're determining gestures
+        # gesturePoints = gesturePoints[:-2]
+        gesturePoints = np.array(gesturePoints, dtype = float)
+        # Make them both start at the same place
+        gesturePoints = GestureTemplate.normalizePoints(gesturePoints)
+        # print "Normalized:", gesturePoints
+        # Scale based on the max dimensions instead of distance
+        # print "TemplateDim:", GestureTemplate.maxDim(self.points)
+        # print "GestureDim:", GestureTemplate.maxDim(gesturePoints)
+        scaleFactor = GestureTemplate.maxDim(self.points)["maxDim"] / GestureTemplate.maxDim(gesturePoints)["maxDim"]
+        # print "Scale Factor:", scaleFactor
+        gesturePoints *= scaleFactor
+        # print "Scaled:", gesturePoints
+        # Both the template and the gesture will have (0, 0) for their start point
+        # so that can be safely ignored
+        # Directly map the indices of the gesture to the template
+        totalError = 0
+        for i in xrange(1, len(gesturePoints)):
+            selfIndex = int(i * (len(self.points) - 1) / float((len(gesturePoints) -1)))
+            # print i, self.points[selfIndex], gesturePoints[i]
+            totalError += GestureTemplate.error(self.points[selfIndex], gesturePoints[i])
+        # print totalError
+        # print totalError/gestureDistance
+        # print "Total Error:", totalError
+        return totalError/scaleFactor
+
+    @staticmethod
+    # Takes points, returns an array of the same length with indices matching 
+    # cumulative distance, to take linearization indices from.
+    def curveLengthWithCumulativeDistanceIndices(points):
+        indices = np.empty(len(points))
+        cumulativeDistance = 0
+        indices[0] = 0
+        for i in xrange(1, len(points)):
+            cumulativeDistance += GestureTemplate.distance(points[i], points[i-1])
+            indices[i] = int(cumulativeDistance)
+        return cumulativeDistance, indices
+
+    @staticmethod
+    def distance(point1, point2):
+        return ((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2) ** 0.5
+
+    def compareGestures(self, gesturePoints):
+        gesturePoints = np.array(gesturePoints, dtype = float)
+        # Start by normalizing the points so that they start at (0, 0)
+        gesturePoints = GestureTemplate.normalizePoints(gesturePoints)
+        # Then scale the points to match the global curve max dim.
+        scaleFactor = GestureTemplate.__GestureMaxDim / GestureTemplate.maxDim(gesturePoints)["maxDim"]
+        gesturePoints *= scaleFactor
+        # So now both the gesture and the template have the same max dimension
+        # Then, compute the curve's distance
+        gestureDistance, distanceIndices = GestureTemplate.curveLengthWithCumulativeDistanceIndices(gesturePoints)
+
+        # Gesture distance determines number of partitions of the template curve
+        # Subsequent distances form indices
+
+    def comparePoints(self, distanceIndices):
+        pass
+
 
     @staticmethod
     def error(point1, point2):
@@ -67,16 +147,28 @@ class HandProcessor(object):
         
     def initGestureTemplates(self):
         self.gestureTemplates = []
-        hLineLR = GestureTemplate([(-x, 0) for x in xrange(100)],
+        hLineLR = GestureTemplate([(-x, 0) for x in xrange(15)],
             name="Horizontal Line Right to Left")
         self.gestureTemplates.append(hLineLR)
-        hLineRL = GestureTemplate([(x, 0) for x in xrange(100)],
+        hLineRL = GestureTemplate([(x, 0) for x in xrange(15)],
             name="Horizontal Line Left to Right")
         self.gestureTemplates.append(hLineRL)
+        # Y is reversed, remember?
         # let's try something more complicated, like a circle:
-        circlePoints = [(10*math.cos(t), 10*math.sin(t)) for t in np.linspace(0, 2*math.pi, num=100)]
-        ccwCircle = GestureTemplate(circlePoints, name="CCW Circle")
+        circlePoints = [(10*math.cos(t), 10*math.sin(t)) for t in np.linspace(0, 2*math.pi, num=15)]
+        ccwCircle = GestureTemplate(circlePoints, name="CW Circle")
         self.gestureTemplates.append(ccwCircle)
+        circlePoints = [(10*math.cos(t), -10*math.sin(t)) for t in np.linspace(0, 2*math.pi, num=15)]
+        cwCircle = GestureTemplate(circlePoints, name="CCW Circle")
+        self.gestureTemplates.append(cwCircle)
+        for i in self.gestureTemplates:
+            print i.points
+
+        # for i in self.gestureTemplates:
+        #     print i.name
+        #     print i.templateDistance
+        #     print np.array(i.points)
+
 
     def close(self):
         self.cap.release()
@@ -131,27 +223,8 @@ class HandProcessor(object):
             self.recentPositions = sorted(self.handCenterPositions[-30:])
             self.x = [pos[0] for pos in self.recentPositions]
             self.y = [pos[1] for pos in self.recentPositions]
-            self.poly = np.polyfit(self.x, self.y, 1)
-            # print self.poly
         else:
             self.recentPositions = []
-
-    def drawCenter(self):
-        cv2.circle(self.drawingCanvas, (self.handXCenterMoment, self.handYCenterMoment), 10, (255, 255, 255), -2)
-        if len(self.recentPositions) != 0:
-            for i in xrange(len(self.recentPositions)):
-                cv2.circle(self.drawingCanvas, self.recentPositions[i], 5, (255, 25*i, 25*i), -1)
-
-    def draw(self):
-        self.drawingCanvas = np.zeros(self.original.shape, np.uint8)
-        self.drawHandContour(True)
-        self.drawHullContour(True)
-        self.drawDefects(True)
-        self.drawCenter()
-        cv2.circle(self.drawingCanvas, (0, 0), 30, (255, 255, 255), -1)
-        cv2.circle(self.drawingCanvas, (500, 0), 30, (0, 255, 255), -1)
-        cv2.imshow('HandContour', self.drawingCanvas)
-
 
     def setHandDimensions(self):
         rect = cv2.minAreaRect(self.handContour)
@@ -169,15 +242,20 @@ class HandProcessor(object):
             self.gesturePoints = []
 
     def classifyGesture(self):
-        minError = 2*31 - 1 # a large value
+        minError = 2**31 - 1 # a large value
         minErrorIndex = -1
         for i in xrange(len(self.gestureTemplates)):
-            error = self.gestureTemplates[i].compareGesture(self.gesturePoints) 
-            print self.gestureTemplates[i].name, "Error:", error
+            error = self.gestureTemplates[i].compareGestureMaxDim(self.gesturePoints)
+            print self.gestureTemplates[i].name, "error: ", error
             if error < minError:
                 minError = error
                 minErrorIndex = i
-        print self.gestureTemplates[minErrorIndex].name
+        if minError < 100:
+            print self.gestureTemplates[minErrorIndex].name
+            return minErrorIndex
+        else:
+            print "No gesture match found"
+            return None
 
     def detemineStationary(self):
         # Figure out of the past few points have been at roughly the same position
@@ -207,16 +285,6 @@ class HandProcessor(object):
             self.stationary = True
             # print "Stationary!"
 
-    def printValues(self):
-        print "Hand Contour:"
-        print self.handContour
-        print
-        print "Hull Point Indices:"
-        print self.hullHandContour
-        print 
-        print "Defects:"
-        print self.defects
-
     def process(self):
         while (self.cap.isOpened()):
             retVal, self.original = self.cap.read()
@@ -228,8 +296,6 @@ class HandProcessor(object):
             self.setHandDimensions()
             self.analyzeHandCenter()
             self.determineIfGesture()
-            # self.printValues()
-            # break
             self.draw()
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -239,6 +305,14 @@ class HandProcessor(object):
         if index < len(self.handContour):
             return (self.handContour[index][0][0], self.handContour[index][0][1])
         return None
+
+# Various Drawing Methods
+
+    def drawCenter(self):
+        cv2.circle(self.drawingCanvas, (self.handXCenterMoment, self.handYCenterMoment), 10, (255, 255, 255), -2)
+        if len(self.recentPositions) != 0:
+            for i in xrange(len(self.recentPositions)):
+                cv2.circle(self.drawingCanvas, self.recentPositions[i], 5, (255, 25*i, 25*i), -1)
 
     def drawHandContour(self, bubbles = False):
         cv2.drawContours(self.drawingCanvas, [self.handContour], 0, (0, 255, 0), 1)
@@ -269,6 +343,16 @@ class HandProcessor(object):
             for j in xrange(len(pointsList[i])):
                 cv2.circle(self.drawingCanvas, (pointsList[i][j][0], pointsList[i][j][1]), width, color)
 
+    def draw(self):
+        self.drawingCanvas = np.zeros(self.original.shape, np.uint8)
+        self.drawHandContour(True)
+        self.drawHullContour(True)
+        self.drawDefects(True)
+        self.drawCenter()
+        cv2.circle(self.drawingCanvas, (0, 0), 30, (255, 255, 255), -1)
+        cv2.circle(self.drawingCanvas, (500, 0), 30, (0, 255, 255), -1)
+        cv2.imshow('HandContour', self.drawingCanvas)
+
 HandProcessor().process()
 
 class HandProcessorSingleImage(HandProcessor):
@@ -296,6 +380,17 @@ class HandProcessorSingleImage(HandProcessor):
 
 # HandProcessorSingleImage().process()
 
-# lineTemplate = GestureTemplate([(x, 0) for x in xrange(21)])
-# print GestureTemplate.curveDistance([(0, 0), (100, 0), (200, 0)])
-# print lineTemplate.compareGesture([(0, 0), (100, 0), (200, 0)])
+lineTemplate = GestureTemplate([(x, 0) for x in xrange(301)])
+
+# print GestureTemplate.curveLength([(0, 0), (100, 0), (200, 0)])
+# print lineTemplate.compareGestureMaxDim([(x, 0) for x in xrange(0, 300, 20)])
+circlePoints = [(10*math.cos(t), 10*math.sin(t)) for t in np.linspace(0, 2*math.pi, num=301)]
+ccwCircleTemplate = GestureTemplate(circlePoints, name="CW Circle")
+
+parabolaPoints = [(t, 2**t) for t in np.linspace(0, 20, num = 20)]
+
+print lineTemplate.compareGestures(np.array(parabolaPoints))
+
+
+# print lineTemplate.compareGestures(np.array(circlePoints)*20)
+# print ccwCircleTemplate.compareGestures(np.array(circlePoints)*20)
