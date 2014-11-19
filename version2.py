@@ -124,6 +124,12 @@ class GestureTemplate(object):
         # Subsequent distances form indices
 
     def comparePoints(self, distanceIndices):
+        # Using the distance index of the gesture point, scale it up/down to 
+        # match the max distance of the template curve. Then figure out which
+        # of the values in the template distance indices hold the closest values
+        # to the given index. Get the actual value of those two points, linearize
+        # between them, and then figure out how far to tend toward one point
+        # using the value of the template distance.
         pass
 
 
