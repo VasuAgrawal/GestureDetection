@@ -251,7 +251,7 @@ class HandProcessor(object):
         minError = 2**31 - 1 # a large value
         minErrorIndex = -1
         for i in xrange(len(self.gestureTemplates)):
-            error = self.gestureTemplates[i].compareGestureMaxDim(self.gesturePoints)
+            error = self.gestureTemplates[i].compareGesture(self.gesturePoints)
             print self.gestureTemplates[i].name, "error: ", error
             if error < minError:
                 minError = error
@@ -386,16 +386,16 @@ class HandProcessorSingleImage(HandProcessor):
 
 # HandProcessorSingleImage().process()
 
-lineTemplate = GestureTemplate([(x, 0) for x in xrange(301)])
+# lineTemplate = GestureTemplate([(x, 0) for x in xrange(301)])
 
-# print GestureTemplate.curveLength([(0, 0), (100, 0), (200, 0)])
-# print lineTemplate.compareGestureMaxDim([(x, 0) for x in xrange(0, 300, 20)])
-circlePoints = [(10*math.cos(t), 10*math.sin(t)) for t in np.linspace(0, 2*math.pi, num=301)]
-ccwCircleTemplate = GestureTemplate(circlePoints, name="CW Circle")
+# # print GestureTemplate.curveLength([(0, 0), (100, 0), (200, 0)])
+# # print lineTemplate.compareGestureMaxDim([(x, 0) for x in xrange(0, 300, 20)])
+# circlePoints = [(10*math.cos(t), 10*math.sin(t)) for t in np.linspace(0, 2*math.pi, num=301)]
+# ccwCircleTemplate = GestureTemplate(circlePoints, name="CW Circle")
 
-parabolaPoints = [(t, 2**t) for t in np.linspace(0, 20, num = 20)]
+# parabolaPoints = [(t, 2**t) for t in np.linspace(0, 20, num = 20)]
 
-print lineTemplate.compareGestures(np.array(parabolaPoints))
+# print lineTemplate.compareGestures(np.array(parabolaPoints))
 
 
 # print lineTemplate.compareGestures(np.array(circlePoints)*20)
