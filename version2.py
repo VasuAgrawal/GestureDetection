@@ -24,6 +24,7 @@ class Gesture(object):
         self.distance = Gesture.curveLength(self.points)
         self.distance, self.distanceIndices = Gesture.curveLengthDI(self.points)
         self.name = name
+        print self.name
 
     @staticmethod
     def curveLength(points):
@@ -50,7 +51,7 @@ class Gesture(object):
     @staticmethod
     # Takes points, returns an array of the same length with indices matching 
     # cumulative distance, to take linearization indices from.
-    def curveLength(points):
+    def curveLengthDI(points):
         indices = np.empty(len(points))
         cumulativeDistance = 0
         indices[0] = 0
@@ -67,7 +68,7 @@ class Gesture(object):
     def compareGestures(template, humanGesture):
         def findIndices(templateDistance):
             if templateDistance > template.distanceIndices[-1]:
-                return len(distanceIndices) - 2, len(distanceIndices) - 1
+                return len(template.distanceIndices) - 2, len(template.distanceIndices) - 1
             elif templateDistance < template.distanceIndices[0]:
                 return 0, 1
             start = 0
@@ -116,7 +117,7 @@ class Gesture(object):
             totalError += distance ** 2 # come up with a better error function?
         minDistance = min(distances)
         maxDistance = max(distances)
-        distanceRange = minDistance - maxDistance
+        distanceRange = maxDistance - minDistance
         return {Gesture.distanceList: distances,
                 Gesture.minDistance: minDistance,
                 Gesture.maxDistance: maxDistance,
@@ -126,8 +127,8 @@ class Gesture(object):
         # Gesture distance determines number of partitions of the template curve
         # Subsequent distances form indices
 
-    def action():
-        pass
+    def action(self):
+        print self.name
 
 class HandProcessor(object):
     def __init__(self, gestureFile = "gestureData.txt"):
@@ -142,17 +143,19 @@ class HandProcessor(object):
         self.endGesture = False
         self.gesturePoints = []
         self.gestureFile = gestureFile
-        self.initGestures(gestureFile)
         self.gestureHeader = "Gesture Name: "
         self.gestureEnd = "END GESTURE"
+        self.initGestures()
 
     def initGestures(self):
         if path.isfile(self.gestureFile):
             self.loadGesturesFromFile()
         else:
             self.loadDefaultGestures()
+        self.loadDefaultGestures()
+        self.gestures = self.gestures[:2]
 
-    def loadGestureFromFile(self):
+    def loadGesturesFromFile(self):
         self.gestures = []
         with open(self.gestureFile, 'r') as fin:
             data = fin.read().split('\n')
@@ -270,7 +273,6 @@ class HandProcessor(object):
         elif self.prevRecordState == True and not self.record:
             minGesturePoints = 5 # Should last a few frames at least
             if len(self.gesturePoints) > minGesturePoints:
-                # print "Gesture:", self.gesturePoints
                 gestureIndex = self.classifyGesture()
                 if gestureIndex != None:
                     self.gestures[gestureIndex].action()
@@ -309,22 +311,29 @@ class HandProcessor(object):
         assessments = [{}] * len(self.gestures)
         for i in xrange(len(self.gestures)):
             assessments[i] = Gesture.compareGestures(self.gestures[i], self.humanGesture)
+            print self.gestures[i].name
+            print assessments[i]
         def findMax(key):
             maxFound = 0
             maxIndex = 0
             for i in xrange(len(assessments)):
                 if assessments[i][key] > maxFound:
+                    maxFound = assessments[i][key]
                     maxIndex = i
-            return i
+            return maxFound, maxIndex
         # start by figuring out how the total errors compare for the gestures
-        maxError = findMax(Gesture.totalError)
-        maxRange = findMax(Gesture.distanceRange)
+        maxError, maxErrorIndex = findMax(Gesture.totalError)
+        maxRange, maxRangeIndex = findMax(Gesture.distanceRange)
+        print maxError, maxRange
         for i in xrange(len(assessments)):
-            errorRatio = assessments[i][Gesture.totalError]
+            errorRatio = assessments[i][Gesture.totalError] / maxError
+            print errorRatio
             likelihoodScores[i] += 1 - errorRatio # The closer it is to the max error, the less likely
-            rangeRatio = assessments[i][Gesture.distanceRange]
+            rangeRatio = assessments[i][Gesture.distanceRange] / maxRange
+            print rangeRatio
             likelihoodScores[i] += 1 - rangeRatio
         maxLikelihood = max(likelihoodScores)
+        print likelihoodScores
         if maxLikelihood > 1.5:
             return likelihoodScores.index(maxLikelihood)
         else:
@@ -394,8 +403,8 @@ class HandProcessor(object):
         self.drawHullContour(True)
         self.drawDefects(True)
         self.drawCenter()
-        cv2.imshow('HandContour', self.drawingCanvas)
         cv2.imshow('Original', self.original)
+        cv2.imshow('HandContour', self.drawingCanvas)
 
 HandProcessor().process()
 
