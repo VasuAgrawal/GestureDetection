@@ -24,7 +24,6 @@ class Gesture(object):
         self.distance = Gesture.curveLength(self.points)
         self.distance, self.distanceIndices = Gesture.curveLengthDI(self.points)
         self.name = name
-        print self.name
 
     @staticmethod
     def curveLength(points):
@@ -66,6 +65,13 @@ class Gesture(object):
 
     @staticmethod
     def compareGestures(template, humanGesture):
+        # print template.name
+        # print template.points
+        # print template.distanceIndices
+        # print
+        # print humanGesture.name
+        # print humanGesture.points
+        # print humanGesture.distanceIndices
         def findIndices(templateDistance):
             if templateDistance > template.distanceIndices[-1]:
                 return len(template.distanceIndices) - 2, len(template.distanceIndices) - 1
@@ -112,18 +118,21 @@ class Gesture(object):
                         humanGesture.distance) 
             comparePoint = linearizeTemplate(toFind)
             distance = Gesture.distance(comparePoint, humanGesture.points[i])
+            # print comparePoint, humanGesture.points[i], distance
             totalDistance += distance
             distances += [distance]
             totalError += distance ** 2 # come up with a better error function?
         minDistance = min(distances)
         maxDistance = max(distances)
         distanceRange = maxDistance - minDistance
-        return {Gesture.distanceList: distances,
+        assessment = {Gesture.distanceList: distances,
                 Gesture.minDistance: minDistance,
                 Gesture.maxDistance: maxDistance,
                 Gesture.totalDistance: totalDistance,
                 Gesture.distanceRange: distanceRange,
                 Gesture.totalError: totalError}
+        # print assessment
+        return assessment
         # Gesture distance determines number of partitions of the template curve
         # Subsequent distances form indices
 
@@ -153,7 +162,7 @@ class HandProcessor(object):
         else:
             self.loadDefaultGestures()
         self.loadDefaultGestures()
-        self.gestures = self.gestures[:2]
+        # self.gestures = self.gestures[:2]
 
     def loadGesturesFromFile(self):
         self.gestures = []
@@ -189,11 +198,11 @@ class HandProcessor(object):
         # Y is reversed, remember?
         # let's try something more complicated, like a circle:
         circlePoints = [(10*math.cos(t), 10*math.sin(t)) \
-                                    for t in np.linspace(0, 2*math.pi, num=15)]
+                                    for t in np.linspace(0, 2*math.pi, num=256)]
         ccwCircle = Gesture(circlePoints, name="CW Circle")
         self.gestures.append(ccwCircle)
         circlePoints = [(10*math.cos(t), -10*math.sin(t)) \
-                                    for t in np.linspace(0, 2*math.pi, num=15)]
+                                    for t in np.linspace(0, 2*math.pi, num=256)]
         cwCircle = Gesture(circlePoints, name="CCW Circle")
         self.gestures.append(cwCircle)
 
@@ -306,38 +315,25 @@ class HandProcessor(object):
     def classifyGesture(self):
         minError = 2**31 - 1 # a large value
         minErrorIndex = -1
-        self.humanGesture = Gesture(self.gesturePoints)
+        self.humanGesture = Gesture(self.gesturePoints, "Human Gesture")
         likelihoodScores = [0] * len(self.gestures)
         assessments = [{}] * len(self.gestures)
         for i in xrange(len(self.gestures)):
+            # print "Calling:", self.gestures[i].name, self.humanGesture.name
             assessments[i] = Gesture.compareGestures(self.gestures[i], self.humanGesture)
-            print self.gestures[i].name
-            print assessments[i]
-        def findMax(key):
-            maxFound = 0
-            maxIndex = 0
-            for i in xrange(len(assessments)):
-                if assessments[i][key] > maxFound:
-                    maxFound = assessments[i][key]
-                    maxIndex = i
-            return maxFound, maxIndex
-        # start by figuring out how the total errors compare for the gestures
-        maxError, maxErrorIndex = findMax(Gesture.totalError)
-        maxRange, maxRangeIndex = findMax(Gesture.distanceRange)
-        print maxError, maxRange
-        for i in xrange(len(assessments)):
-            errorRatio = assessments[i][Gesture.totalError] / maxError
-            print errorRatio
-            likelihoodScores[i] += 1 - errorRatio # The closer it is to the max error, the less likely
-            rangeRatio = assessments[i][Gesture.distanceRange] / maxRange
-            print rangeRatio
-            likelihoodScores[i] += 1 - rangeRatio
-        maxLikelihood = max(likelihoodScores)
-        print likelihoodScores
-        if maxLikelihood > 1.5:
-            return likelihoodScores.index(maxLikelihood)
-        else:
-            return None
+            # print self.gestures[i].name
+            # print assessments[i]
+        errorList = [assessments[i][Gesture.totalError] for i in xrange(len(assessments))]
+        index = errorList.index(min(errorList))
+        # Basic elimination to figure out if result is valid
+        templateGestureRatio = max((self.gestures[index].distance / self.humanGesture.distance), 
+                    (self.humanGesture.distance / self.gestures[index].distance))
+        distanceDiffRatio = assessments[index][Gesture.totalDistance] / min(self.gestures[index].distance, self.humanGesture.distance)
+        if templateGestureRatio < 1.25 and distanceDiffRatio < 2:
+            self.gestures[index].action()
+
+        # print self.gestures[index].name, "Template Distance:", self.gestures[index].distance, "Gesture Distance:", self.humanGesture.distance, "Distance Diff:", assessments[index][Gesture.totalDistance]
+
 
     def process(self):
         while (self.cap.isOpened()):
