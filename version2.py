@@ -29,30 +29,30 @@ class HandProcessor(object):
             self.loadGesturesFromFile()
         else:
             self.loadDefaultGestures()
-        # self.loadDefaultGestures()
-        # self.gestures = self.gestures[:2]
 
     def loadGesturesFromFile(self):
         self.gestures = []
+        read = ""
         with open(self.gestureFile, 'r') as fin:
-            data = fin.read().split('\n')
-            if len(data) < len(self.gestureHeader):
-                self.loadDefaultGestures()
-            else:
-                gestureName = ""
-                gesturePoints = []
-                cutoff = len(self.gestureHeader)
-                for item in data:
-                    if item[:cutoff] == self.gestureHeader:
-                        gestureName = item[cutoff:]
-                    elif item == self.gestureEnd:
-                        self.gestures.append(Gesture(gesturePoints, gestureName))
-                        self.gestureName = ""
-                        self.gesturePoints = []
-                    else:
-                        gesturePoints.append(map(float, item.split()))
+            read = fin.read()
             fin.close()
-
+        data = read.split('\n')
+        # Basic check, should replace later with bytestream instead
+        if len(data) < len(self.gestureHeader):
+            self.loadDefaultGestures()
+        else:
+            gestureName = ""
+            gesturePoints = []
+            cutoff = len(self.gestureHeader)
+            for item in data:
+                if item[:cutoff] == self.gestureHeader:
+                    gestureName = item[cutoff:]
+                elif item == self.gestureEnd:
+                    self.gestures.append(Gesture(gesturePoints, gestureName))
+                    gestureName = ""
+                    gesturePoints = []
+                else:
+                    gesturePoints.append(map(float, item.split()))
 
     # Initiate some default gesures in the event that no gesture file was found
     def loadDefaultGestures(self):
@@ -64,7 +64,6 @@ class HandProcessor(object):
         cv2.destroyAllWindows()
 
     def saveGestures(self):
-        os.remove(self.gestureFile)
         with open(self.gestureFile, 'w+') as fout:
             for gesture in self.gestures:
                 fout.write(self.gestureHeader + gesture.name + '\n')

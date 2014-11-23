@@ -5,7 +5,7 @@ import numpy as np
 defaultGestures = []
 
 def makeLines():
-    pointCount = 256 + 1
+    pointCount = 256
     hLineLR = Gesture([(-t, 0) for t in xrange(pointCount)],
                     name="Horizontal Line Right to Left")
     hLineRL = Gesture([(t, 0) for t in xrange(pointCount)],

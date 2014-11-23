@@ -61,14 +61,6 @@ class Gesture(object):
 
     @staticmethod
     def compareGestures(template, humanGesture):
-        if template.name == "Infinity":
-            print template.name
-            print template.points
-            print template.distanceIndices
-            print
-            print humanGesture.name
-            print humanGesture.points
-            print humanGesture.distanceIndices
         def findIndices(templateDistance):
             if templateDistance > template.distanceIndices[-1]:
                 return len(template.distanceIndices) - 2, len(template.distanceIndices) - 1
@@ -115,7 +107,6 @@ class Gesture(object):
                         humanGesture.distance) 
             comparePoint = linearizeTemplate(toFind)
             distance = Gesture.distance(comparePoint, humanGesture.points[i])
-            if template.name == "Infinity": print comparePoint, humanGesture.points[i], distance
             totalDistance += distance
             distances += [distance]
             totalError += distance ** 2 # come up with a better error function?
@@ -128,7 +119,6 @@ class Gesture(object):
                 Gesture.totalDistance: totalDistance,
                 Gesture.distanceRange: distanceRange,
                 Gesture.totalError: totalError}
-        if template.name == "Infinity": print assessment
         return assessment
         # Gesture distance determines number of partitions of the template curve
         # Subsequent distances form indices
