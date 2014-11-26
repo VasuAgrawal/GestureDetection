@@ -8,8 +8,9 @@ from PIL import Image, ImageTk
 class GestureDemo(EventBasedAnimationClass):
     def __init__(self):
         self.gp = GestureProcessor("Somefile.txt") # will default to usual file
-        super(GestureDemo, self).__init__(width=self.gp.cameraWidth,
-                                            height=self.gp.cameraHeight)
+        super(GestureDemo, self).__init__(width=1920, height=1080)
+        # super(GestureDemo, self).__init__(width=self.gp.cameraWidth,
+        #                                     height=self.gp.cameraHeight)
         self.timerDelay = 1000 / 30 # 30 FPS
         self.bindGestures()
 
@@ -35,8 +36,14 @@ class GestureDemo(EventBasedAnimationClass):
     def redrawAll(self):
         cv2image = self.gp.getRGBAOriginal()
         imgtk = ImageTk.PhotoImage(image=Image.fromarray(cv2image))
-        self.imagetk = imgtk
+        self.imagetk = imgtk # Need this for persistence because of garbage collection
         self.canvas.create_image(0, 0, image=imgtk, anchor="nw")
+
+        self.gp.draw()
+        cv2image = self.gp.getRGBACanvas()
+        imgtk2 = ImageTk.PhotoImage(image=Image.fromarray(cv2image))
+        self.imagetk2 = imgtk2 # Need this for persistence because of garbage collection
+        self.canvas.create_image(1920, 1080, image=imgtk2, anchor="se")
 
     def run(self):
         super(GestureDemo, self).run()

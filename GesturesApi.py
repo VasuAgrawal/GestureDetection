@@ -241,6 +241,9 @@ class GestureProcessor(object):
     def getRGBAOriginal(self):
         return cv2.cvtColor(self.original, cv2.COLOR_BGR2RGBA)
 
+    def getRGBACanvas(self):
+        return cv2.cvtColor(self.drawingCanvas, cv2.COLOR_BGR2RGBA)
+
 # Various Drawing Methods
 
     def drawCenter(self):
@@ -284,8 +287,8 @@ class GestureProcessor(object):
         self.drawHullContour(True)
         self.drawDefects(True)
         self.drawCenter()
-        cv2.imshow('Original', self.original)
-        cv2.imshow('HandContour', self.drawingCanvas)
+        # cv2.imshow('Original', self.original)
+        # cv2.imshow('HandContour', self.drawingCanvas)
 
 # GestureProcessor().process()
 
