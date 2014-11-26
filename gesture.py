@@ -123,5 +123,5 @@ class Gesture(object):
         # Gesture distance determines number of partitions of the template curve
         # Subsequent distances form indices
 
-    def action(self):
+    def action(self, *args, **kwargs):
         print self.name

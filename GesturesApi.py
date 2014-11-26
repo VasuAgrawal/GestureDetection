@@ -1,17 +1,16 @@
 import cv2
 import numpy as np
 import time
-import math
-import sys
 import os
 import defaultGesturesLoader
 from gesture import Gesture
+import random
 
-class HandProcessor(object):
+class GestureProcessor(object):
     def __init__(self, gestureFile = "gestureData.txt"):
         self.cap = cv2.VideoCapture(0)
-        self.cameraWidth = 1920
-        self.cameraHeight = 1080
+        self.cameraWidth = 1280
+        self.cameraHeight = 720
         self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, self.cameraWidth)
         self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, self.cameraHeight)
         self.handCenterPositions = []
@@ -22,6 +21,7 @@ class HandProcessor(object):
         self.gestureFile = gestureFile
         self.gestureHeader = "Gesture Name: "
         self.gestureEnd = "END GESTURE"
+        self.saveNextGesture = False
         self.initGestures()
 
     def initGestures(self):
@@ -140,7 +140,23 @@ class HandProcessor(object):
                 gestureIndex = self.classifyGesture()
                 if gestureIndex != None:
                     self.gestures[gestureIndex].action()
+                elif gestureIndex == None and self.saveNextGesture:
+                    self.addRecordedGesture()
+                    self.saveNextGesture = False
             self.gesturePoints = []
+
+    def saveNext(self):
+        self.saveNextGesture = True
+
+    def addRecordedGesture(self):
+        gestureName = ""
+        while True:
+            gestureName = "".join([chr(random.randint(ord('a'), ord('z'))) for i in xrange(20)])
+            if gestureName not in self.gestures.keys():
+                break
+        newGesture = Gesture(self.gesturePoints, name=gestureName)
+        self.gestures += newGesture
+        return gestureName
 
     def detemineStationary(self):
         # Figure out of the past few points have been at roughly the same position
@@ -190,26 +206,40 @@ class HandProcessor(object):
         # print self.gestures[index].name, "Template Distance:", self.gestures[index].distance, "Gesture Distance:", self.humanGesture.distance, "Distance Diff:", assessments[index][Gesture.totalDistance]
 
 
+    def bind(self, gestureName, fn):
+        if gestureName in self.gestures:
+            self.gestures[gestureName].action = fn
+            return True
+        else:
+            return False
+
+    def getGestureNames(self):
+        return [gesture.name for gesture in self.gestures]
+
+    # importantly, changed so that it works on a tick instead
     def process(self):
-        while (self.cap.isOpened()):
-            retVal, self.original = self.cap.read()
-            self.original = cv2.flip(self.original, 1)
-            self.boostContrast = HandProcessor.boostContrast(self.original)
-            self.thresholded = HandProcessor.threshold(self.boostContrast)
-            self.setContours(self.thresholded.copy())
-            self.findHandContour()
-            self.setHandDimensions()
-            self.analyzeHandCenter()
-            self.determineIfGesture()
-            self.draw()
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-        self.close()
+        # while (self.cap.isOpened()):
+        retVal, self.original = self.cap.read()
+        self.original = cv2.flip(self.original, 1)
+        self.boostContrast = GestureProcessor.boostContrast(self.original)
+        self.thresholded = GestureProcessor.threshold(self.boostContrast)
+        self.setContours(self.thresholded.copy())
+        self.findHandContour()
+        self.setHandDimensions()
+        self.analyzeHandCenter()
+        self.determineIfGesture()
+            # self.draw()
+        #     if cv2.waitKey(1) & 0xFF == ord('q'):
+        #         break
+        # self.close()
 
     def getPoint(self, index):
         if index < len(self.handContour):
             return (self.handContour[index][0][0], self.handContour[index][0][1])
         return None
+
+    def getRGBAOriginal(self):
+        return cv2.cvtColor(self.original, cv2.COLOR_BGR2RGBA)
 
 # Various Drawing Methods
 
@@ -257,15 +287,15 @@ class HandProcessor(object):
         cv2.imshow('Original', self.original)
         cv2.imshow('HandContour', self.drawingCanvas)
 
-HandProcessor().process()
+# GestureProcessor().process()
 
-class HandProcessorSingleImage(HandProcessor):
+class GestureProcessorSingleImage(GestureProcessor):
     def __init__(self):
         self.original = cv2.imread('oneHand.jpg')
 
     def process(self):
-        self.boostContrast = HandProcessor.boostContrast(self.original)
-        self.thresholded = HandProcessor.threshold(self.boostContrast)
+        self.boostContrast = GestureProcessor.boostContrast(self.original)
+        self.thresholded = GestureProcessor.threshold(self.boostContrast)
         self.setContours(self.thresholded.copy())
         self.findHandContour()
         self.draw()
@@ -282,4 +312,4 @@ class HandProcessorSingleImage(HandProcessor):
         self.drawDefects(True)
         cv2.imshow('HandContour', self.drawingCanvas)
 
-# HandProcessorSingleImage().process()
+# GestureProcessorSingleImage().process()
