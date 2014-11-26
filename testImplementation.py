@@ -12,11 +12,14 @@ class GestureDemo(EventBasedAnimationClass):
         # super(GestureDemo, self).__init__(width=self.gp.cameraWidth,
         #                                     height=self.gp.cameraHeight)
         self.timerDelay = 1000 / 30 # 30 FPS
-        self.bindGestures()
+        # self.bindGestures()
+        def fn(): print "HELLO IM YELLOW"
+        self.gp.gestures[0].action = fn
 
     def bindGestures(self):
-        def action(self):
-            print "LOOK I'M WORKING FROM TKINTER,", self.name
+        print self.gp.getGestureNames()
+        def action():
+            print "LOOK I'M WORKING FROM TKINTER"
         for gName in self.gp.getGestureNames():
             self.gp.bind(gName, action)
 
@@ -33,17 +36,26 @@ class GestureDemo(EventBasedAnimationClass):
     def onTimerFired(self):
         self.gp.process()
 
+    # This is terrible code and I should really come up with a better way of doing this
     def redrawAll(self):
+        self.canvas.delete(ALL)
         cv2image = self.gp.getRGBAOriginal()
         imgtk = ImageTk.PhotoImage(image=Image.fromarray(cv2image))
         self.imagetk = imgtk # Need this for persistence because of garbage collection
         self.canvas.create_image(0, 0, image=imgtk, anchor="nw")
+
+        cv2image = self.gp.getRGBAThresh(.75, .75)
+        imgtk3 = ImageTk.PhotoImage(image=Image.fromarray(cv2image))
+        self.imagetk3 = imgtk3 # Need this for persistence because of garbage collection
+        self.canvas.create_image(0, 1080, image=imgtk3, anchor="sw")
 
         self.gp.draw()
         cv2image = self.gp.getRGBACanvas()
         imgtk2 = ImageTk.PhotoImage(image=Image.fromarray(cv2image))
         self.imagetk2 = imgtk2 # Need this for persistence because of garbage collection
         self.canvas.create_image(1920, 1080, image=imgtk2, anchor="se")
+
+        self.canvas.create_text(1920, 0, text=self.gp.lastAction, anchor="ne", font = "15")
 
     def run(self):
         super(GestureDemo, self).run()

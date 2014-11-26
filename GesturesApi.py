@@ -5,6 +5,7 @@ import os
 import defaultGesturesLoader
 from gesture import Gesture
 import random
+import itertools
 
 class GestureProcessor(object):
     def __init__(self, gestureFile = "gestureData.txt"):
@@ -22,6 +23,7 @@ class GestureProcessor(object):
         self.gestureHeader = "Gesture Name: "
         self.gestureEnd = "END GESTURE"
         self.saveNextGesture = False
+        self.lastAction = ""
         self.initGestures()
 
     def initGestures(self):
@@ -107,12 +109,41 @@ class GestureProcessor(object):
         self.hullHandContour = cv2.convexHull(self.handContour, returnPoints = False)
         self.defects = cv2.convexityDefects(self.handContour, self.hullHandContour)
         self.handMoments = cv2.moments(self.handContour)
-        self.handXCenterMoment = int(self.handMoments["m10"]/self.handMoments["m00"])
-        self.handYCenterMoment = int(self.handMoments["m01"]/self.handMoments["m00"])
+        self.setHandDimensions()
+        self.findHandCenter()
         self.handCenterPositions += [(self.handXCenterMoment, self.handYCenterMoment)]
         if len(self.handCenterPositions) > 10:
             self.canDoGestures = True
         else: self.canDoGestures = False
+
+
+    def findHandCenter(self):
+        self.handXCenterMoment = int(self.handMoments["m10"]/self.handMoments["m00"])
+        self.handYCenterMoment = int(self.handMoments["m01"]/self.handMoments["m00"])
+        defectPoints = []
+        minDistance = 1000
+        for i in self.defects:
+            if i[0][3] > minDistance:
+                defectPoints.append(self.handContour[i[0][2]])
+        defectPoints = np.array(defectPoints, dtype = np.int32)
+        combinations = itertools.combinations(defectPoints, 3) # make a triangle
+        centerCandidates = []
+        dirs = np.array([[-1, 0], [1, 0], [0, -1], [0, 1]])
+        for combination in combinations:
+            tPoints = []
+            for point in combination:
+                tPoints.extend(point)
+            center, radius = cv2.minEnclosingCircle(np.array(tPoints))
+            center = np.array(center)
+            centerCandidates.append(np.array([radius, center[0], center[1]], dtype=np.int32))
+            # for direction in dirs:
+            #     changedPt = center + direction * radius
+            #     if (changedPt[0] > self.minX and changedPt[0] < self.maxX and
+            #         changedPt[1] > self.minY and changedPt[1] < self.maxY):
+            #         centerCandidates.append(np.array([radius, center[0], center[1]], dtype=np.int32))
+        # centerCandidates = np.array(centerCandidates)
+        # self.centerCandidates = np.sort(centerCandidates, axis=0)
+        # self.circleCenter = (self.centerCandidates[-1][1], self.centerCandidates[-1][2])
 
     def analyzeHandCenter(self):
         # makes sure that there is actually sufficient data to trace over
@@ -123,11 +154,18 @@ class GestureProcessor(object):
         else:
             self.recentPositions = []
 
-    # def findCircles(self):
-        
+    @staticmethod
+    def maxInscribedCircle(points):
+        A, B, C = points
+        B[1] - A[1] 
+
+        return radius, center
+
 
     def setHandDimensions(self):
-        rect = cv2.minAreaRect(self.handContour)
+        self.minX, self.minY, self.maxX, self.maxY = cv2.boundingRect(self.handContour)
+        self.handWidth = self.maxX - self.minX
+        self.handHeight = self.maxY - self.minY
 
     def determineIfGesture(self):
         self.prevRecordState = self.record
@@ -140,6 +178,7 @@ class GestureProcessor(object):
                 gestureIndex = self.classifyGesture()
                 if gestureIndex != None:
                     self.gestures[gestureIndex].action()
+                    self.lastAction = self.gestures[gestureIndex].name
                 elif gestureIndex == None and self.saveNextGesture:
                     self.addRecordedGesture()
                     self.saveNextGesture = False
@@ -152,10 +191,12 @@ class GestureProcessor(object):
         gestureName = ""
         while True:
             gestureName = "".join([chr(random.randint(ord('a'), ord('z'))) for i in xrange(20)])
-            if gestureName not in self.gestures.keys():
+            if gestureName not in self.getGestureNames():
                 break
         newGesture = Gesture(self.gesturePoints, name=gestureName)
-        self.gestures += newGesture
+        self.gestures.append(newGesture)
+        print "RECORDED NEW ONE", gestureName
+        self.lastAction = gestureName
         return gestureName
 
     def detemineStationary(self):
@@ -201,14 +242,14 @@ class GestureProcessor(object):
                     (self.humanGesture.distance / self.gestures[index].distance))
         distanceDiffRatio = assessments[index][Gesture.totalDistance] / min(self.gestures[index].distance, self.humanGesture.distance)
         if templateGestureRatio < 1.25 and distanceDiffRatio < 2:
-            self.gestures[index].action()
+            return index
 
         # print self.gestures[index].name, "Template Distance:", self.gestures[index].distance, "Gesture Distance:", self.humanGesture.distance, "Distance Diff:", assessments[index][Gesture.totalDistance]
 
 
     def bind(self, gestureName, fn):
         if gestureName in self.gestures:
-            self.gestures[gestureName].action = fn
+            self.gestures[self.getGestureNames().index(gestureName)].action = fn
             return True
         else:
             return False
@@ -238,10 +279,22 @@ class GestureProcessor(object):
             return (self.handContour[index][0][0], self.handContour[index][0][1])
         return None
 
-    def getRGBAOriginal(self):
+    def getRGBAThresh(self, widthScale=1, heightScale=1):
+        if widthScale != 1 or heightScale != 1:
+            resized = cv2.resize(self.thresholded, (0, 0), fx=widthScale, fy=heightScale)
+            return cv2.cvtColor(resized, cv2.COLOR_GRAY2RGBA)    
+        return cv2.cvtColor(self.thresholded, cv2.COLOR_GRAY2RGBA)
+
+    def getRGBAOriginal(self, widthScale=1, heightScale=1):
+        if widthScale != 1 or heightScale != 1:
+            resized = cv2.resize(self.thresholded, (480, 320))
+            return cv2.cvtColor(resized, cv2.COLOR_BGR2RGBA)
         return cv2.cvtColor(self.original, cv2.COLOR_BGR2RGBA)
 
-    def getRGBACanvas(self):
+    def getRGBACanvas(self, widthScale=1, heightScale=1):
+        if widthScale != 1 or heightScale != 1:
+            resized = cv2.resize(self.thresholded, (0, 0), fx=widthScale, fy=heightScale)
+            return cv2.cvtColor(resized, cv2.COLOR_BGR2RGBA)
         return cv2.cvtColor(self.drawingCanvas, cv2.COLOR_BGR2RGBA)
 
 # Various Drawing Methods
@@ -251,6 +304,11 @@ class GestureProcessor(object):
         if len(self.recentPositions) != 0:
             for i in xrange(len(self.recentPositions)):
                 cv2.circle(self.drawingCanvas, self.recentPositions[i], 5, (255, 25*i, 25*i), -1)
+
+    def drawCircles(self):
+        for i in xrange(len(self.centerCandidates)-1, len(self.centerCandidates)-1-min(len(self.centerCandidates), 10), -1):
+            cv2.circle(self.drawingCanvas, (self.centerCandidates[i][1], self.centerCandidates[i][2]), self.centerCandidates[i][0], (255, 0, 255), 3)
+        cv2.circle(self.drawingCanvas, self.circleCenter, 20, (0, 255, 255), -1)
 
     def drawHandContour(self, bubbles = False):
         cv2.drawContours(self.drawingCanvas, [self.handContour], 0, (0, 255, 0), 1)
@@ -287,6 +345,7 @@ class GestureProcessor(object):
         self.drawHullContour(True)
         self.drawDefects(True)
         self.drawCenter()
+        # self.drawCircles()
         # cv2.imshow('Original', self.original)
         # cv2.imshow('HandContour', self.drawingCanvas)
 
