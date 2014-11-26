@@ -246,13 +246,8 @@ class GestureProcessor(object):
 
         # print self.gestures[index].name, "Template Distance:", self.gestures[index].distance, "Gesture Distance:", self.humanGesture.distance, "Distance Diff:", assessments[index][Gesture.totalDistance]
 
-
-    def bind(self, gestureName, fn):
-        if gestureName in self.gestures:
-            self.gestures[self.getGestureNames().index(gestureName)].action = fn
-            return True
-        else:
-            return False
+    def bind(self, gestureIndex, fn):
+        self.gestures[gestureIndex].action = fn
 
     def getGestureNames(self):
         return [gesture.name for gesture in self.gestures]

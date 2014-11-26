@@ -12,16 +12,24 @@ class GestureDemo(EventBasedAnimationClass):
         # super(GestureDemo, self).__init__(width=self.gp.cameraWidth,
         #                                     height=self.gp.cameraHeight)
         self.timerDelay = 1000 / 30 # 30 FPS
-        # self.bindGestures()
-        def fn(): print "HELLO IM YELLOW"
-        self.gp.gestures[0].action = fn
+        self.bindGestures()
+        # def fn(): print "HELLO IM YELLOW"
+        # self.gp.gestures[0].action = fn
+        # def fn(): print "EHLLO I'm PURPLSE"
+        # self.gp.bind(0, fn)
 
     def bindGestures(self):
-        print self.gp.getGestureNames()
-        def action():
-            print "LOOK I'M WORKING FROM TKINTER"
-        for gName in self.gp.getGestureNames():
-            self.gp.bind(gName, action)
+        def fn(): print "HELLO IM YELLOW"
+        self.gp.gestures[0].action = fn
+        def fn(): print "EHLLO I'm PURPLSE"
+        self.gp.bind(0, fn)
+        # print self.gp.getGestureNames()
+        # def action():
+        #     return "LOOK I'M WORKING FROM TKINTER"
+        # for i in xrange(len(self.gp.gestures)):
+        #     def fn():
+        #         print action() + self.gp.gestures[i].name
+        #     self.gp.bind(i, fn)
 
     def onMousePressed(self, event):
         print "You could probably do something with the coords:", (event.x, event.y)
