@@ -12,14 +12,16 @@ Features:
 * Track the hand over multiple frames
 * Detect possible gestures
 * Basic classification of possible gestures
+* Record mode (new gesture training)
+* Hookable API
+* Sample code
 
 Yet to be implemented (in no particular order):
 
-* Gesture training
+* Better hand detection
+* Gesture training (improving old gestures)
 * Finger detection
 * Depth perception
-* Hookable API (and restructuring)
-* Record mode
 
 Installation
 ===========
@@ -28,3 +30,8 @@ Linux: Required modules are probably bundled with your favorite distribution of 
 
 1. On Debian/Ubuntu/similar systems: `sudo apt-get install python`
 2. Download and install OpenCV 2 for Python: http://docs.opencv.org/doc/tutorials/introduction/linux_install/linux_install.html
+
+Usage
+===========
+
+See `testImplementation.py` for example. More documentation to come. (Running any of the other files won't do anything.)
