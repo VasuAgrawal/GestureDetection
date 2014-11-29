@@ -143,11 +143,20 @@ class GestureProcessor(object):
             tPoints = []
             for point in combination:
                 tPoints.extend(point)
-            center, radius = self.maxInscribedCircle(np.array(tPoints))
+            circle = self.maxInscribedCircle(np.array(tPoints))
+            if circle != None:
+                center, radius = circle
+            else:
+                continue
             center = np.array(center)
-            self.centerCandidates.append(np.array([radius, center[0], center[1]],
+            if center[0] < 0 or center[0] > self.cameraWidth or center[1] < 0 or center[1] > self.cameraHeight:
+                continue
+            if radius * 2 < min(self.handWidth, self.handHeight):
+                print np.array([radius, center[0], center[1]], dtype=np.int32), self.handWidth, self.handHeight
+                self.centerCandidates.append(np.array([radius, center[0], center[1]],
                                     dtype=np.int32))
-        print self.centerCandidates
+        print
+
             # for direction in dirs:
             #     changedPt = center + direction * radius
             #     if (changedPt[0] > self.minX and changedPt[0] < self.maxX and
@@ -188,10 +197,7 @@ class GestureProcessor(object):
             return None
 
     def setHandDimensions(self):
-        self.minX, self.minY, self.maxX, self.maxY = cv2.boundingRect(
-                                                            self.handContour)
-        self.handWidth = self.maxX - self.minX
-        self.handHeight = self.maxY - self.minY
+        self.minX, self.minY, self.handWidth, self.handHeight = cv2.boundingRect(self.handContour)
 
     def determineIfGesture(self):
         self.prevRecordState = self.record
