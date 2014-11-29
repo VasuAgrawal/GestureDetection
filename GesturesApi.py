@@ -25,6 +25,8 @@ class GestureProcessor(object):
         self.gestureEnd = "END GESTURE"
         self.saveNextGesture = False
         self.lastAction = ""
+        self.handMomentPositions = []
+        self.handCenterPositions = []
         self.initGestures()
 
     def initGestures(self):
@@ -111,34 +113,44 @@ class GestureProcessor(object):
                 maxArea = area
                 index = i
         self.handContour = self.contours[index]
+
         self.hullHandContour = cv2.convexHull(self.handContour,
                                                 returnPoints = False)
+        self.hullPoints = [self.handContour[i[0]] for i in self.hullHandContour]
+        self.hullPoints = np.array(self.hullPoints, dtype = np.int32)
+
         self.defects = cv2.convexityDefects(self.handContour,
                                             self.hullHandContour)
         self.handMoments = cv2.moments(self.handContour)
         self.setHandDimensions()
         self.findHandCenter()
-        self.handCenterPositions += [(self.handXCenterMoment,
-                                        self.handYCenterMoment)]
+        self.handMomentPositions += [self.handMoment]
+        self.handCenterPositions += [tuple(self.centerAvg)]
         if len(self.handCenterPositions) > 10:
             self.canDoGestures = True
         else: self.canDoGestures = False
 
-
     def findHandCenter(self):
+        def weightedAvg(num1, num2, weight):
+            return (num1 * weight + num2) / (weight + 1)
+
         self.handXCenterMoment = int(self.handMoments["m10"]/
                                         self.handMoments["m00"])
         self.handYCenterMoment = int(self.handMoments["m01"]/
                                         self.handMoments["m00"])
+        self.handMoment = (self.handXCenterMoment, self.handYCenterMoment)
         defectPoints = []
-        minDistance = 1000
+        minDistance = 500
         for i in self.defects:
             if i[0][3] > minDistance:
                 defectPoints.append(self.handContour[i[0][2]])
         defectPoints = np.array(defectPoints, dtype = np.int32)
         combinations = itertools.combinations(defectPoints, 3) # make a triangle
+        # combinations = itertools.combinations(self.hullPoints, 3)
         self.centerCandidates = []
-        dirs = np.array([[-1, 0], [1, 0], [0, -1], [0, 1]])
+        self.centerAvg = [0, 0]
+        self.radAvg = 0
+        circleNum = 0
         for combination in combinations:
             tPoints = []
             for point in combination:
@@ -149,22 +161,16 @@ class GestureProcessor(object):
             else:
                 continue
             center = np.array(center)
-            if center[0] < 0 or center[0] > self.cameraWidth or center[1] < 0 or center[1] > self.cameraHeight:
-                continue
-            if radius * 2 < min(self.handWidth, self.handHeight):
-                print np.array([radius, center[0], center[1]], dtype=np.int32), self.handWidth, self.handHeight
-                self.centerCandidates.append(np.array([radius, center[0], center[1]],
-                                    dtype=np.int32))
-        print
+            if center[0] >= self.minX and center[0] <= self.minX + self.handWidth and center[1] >= self.minY and center[1] <= self.minY + self.handHeight and radius * 2 < min(self.handWidth, self.handHeight):
+                self.centerCandidates.append(np.array([radius, center[0], center[1]], dtype=np.int32))
+                self.centerAvg = [weightedAvg(self.centerAvg[0], center[0], circleNum), weightedAvg(self.centerAvg[1], center[1], circleNum)]
+                self.radAvg = weightedAvg(self.radAvg, radius, circleNum)
+                circleNum += 1
+        if len(self.handMomentPositions) > 0:
+            if Gesture.distance(self.handMoment, self.handMomentPositions[-1]) < 5.0:
+                # staying roughly in place, so only chage the new one by small fraction
+                self.centerAvg = [weightedAvg(self.handCenterPositions[-1][0], self.centerAvg[0], 10), weightedAvg(self.handCenterPositions[-1][1], self.centerAvg[1], 100)]
 
-            # for direction in dirs:
-            #     changedPt = center + direction * radius
-            #     if (changedPt[0] > self.minX and changedPt[0] < self.maxX and
-            #         changedPt[1] > self.minY and changedPt[1] < self.maxY):
-            #         centerCandidates.append(np.array([radius, center[0], center[1]], dtype=np.int32))
-        # centerCandidates = np.array(centerCandidates)
-        # self.centerCandidates = np.sort(centerCandidates, axis=0)
-        # self.circleCenter = (self.centerCandidates[-1][1], self.centerCandidates[-1][2])
 
     def analyzeHandCenter(self):
         # makes sure that there is actually sufficient data to trace over
@@ -334,8 +340,11 @@ class GestureProcessor(object):
                 cv2.circle(self.drawingCanvas, self.recentPositions[i], 5, (255, 25*i, 25*i), -1)
 
     def drawCircles(self):
-        for i in xrange(len(self.centerCandidates)-1, len(self.centerCandidates)-1-min(len(self.centerCandidates), 10), -1):
-            cv2.circle(self.drawingCanvas, (self.centerCandidates[i][1], self.centerCandidates[i][2]), self.centerCandidates[i][0], (255, 0, 255), 3)
+        # for i in xrange(len(self.centerCandidates)-1, len(self.centerCandidates)-1-min(len(self.centerCandidates), 10), -1):
+        #     cv2.circle(self.drawingCanvas, (self.centerCandidates[i][1], self.centerCandidates[i][2]), self.centerCandidates[i][0], (255, 0, 255), 3)
+        #     cv2.circle(self.drawingCanvas, (self.centerCandidates[i][1], self.centerCandidates[i][2]), 2, (255, 0, 255), -1)
+        cv2.circle(self.drawingCanvas, tuple(self.centerAvg), self.radAvg, (255, 0, 255), 3)
+        cv2.circle(self.drawingCanvas, tuple(self.centerAvg), 10, (255, 0, 255), -1)
 
     def drawHandContour(self, bubbles = False):
         cv2.drawContours(self.drawingCanvas, [self.handContour], 0, (0, 255, 0), 1)
@@ -343,13 +352,9 @@ class GestureProcessor(object):
             self.drawBubbles(self.handContour, (255, 255, 0))
 
     def drawHullContour(self, bubbles = False):
-        hullPoints = []
-        for i in self.hullHandContour:
-            hullPoints.append(self.handContour[i[0]])
-        hullPoints = np.array(hullPoints, dtype = np.int32)
-        cv2.drawContours(self.drawingCanvas, [hullPoints], 0, (0, 0, 255), 2)
+        cv2.drawContours(self.drawingCanvas, [self.hullPoints], 0, (0, 0, 255), 2)
         if bubbles:
-            self.drawBubbles(hullPoints, (255, 255, 255))
+            self.drawBubbles(self.hullPoints, (255, 255, 255))
 
     def drawDefects(self, bubbles = False):
         defectPoints = []
