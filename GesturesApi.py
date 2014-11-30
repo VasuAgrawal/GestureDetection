@@ -297,14 +297,23 @@ class GestureProcessor(object):
     # importantly, changed so that it works on a tick instead
     def process(self):
         retVal, self.original = self.cap.read()
+        # print time.time() - prevTime,; prevTime = time.time()
         self.original = cv2.flip(self.original, 1)
-        self.boostContrast = GestureProcessor.boostContrast(self.original)
-        self.thresholded = GestureProcessor.threshold(self.boostContrast)
+        # print time.time() - prevTime,; prevTime = time.time()
+        # self.boostContrast = GestureProcessor.boostContrast(self.original)
+        # print time.time() - prevTime,; prevTime = time.time()
+        self.thresholded = GestureProcessor.threshold(self.original)
+        # print time.time() - prevTime,; prevTime = time.time()
         self.setContours(self.thresholded.copy())
+        # print time.time() - prevTime,; prevTime = time.time()
         self.findHandContour()
+        # print time.time() - prevTime,; prevTime = time.time()
         self.setHandDimensions()
+        # print time.time() - prevTime,; prevTime = time.time()
         self.analyzeHandCenter()
+        # print time.time() - prevTime,; prevTime = time.time()
         self.determineIfGesture()
+        # print time.time() - prevTime; prevTime = time.time()
 
     def getPoint(self, index):
         if index < len(self.handContour):
