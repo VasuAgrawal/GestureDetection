@@ -101,6 +101,44 @@ class GestureProcessor(object):
         self.contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE,
                                                     cv2.CHAIN_APPROX_SIMPLE)
 
+    def setPalmCombinations(self):
+        # Testing confirms that the range of distances is about 5 - 10 for
+        # minimum distance between points, and anywhere from 150 - 200 for max
+        # distance between points. 10 and 100 should be reasonable cutoffs.
+        minDistance = 10
+        maxDistance = 100
+        startTime = time.time()
+        iter = itertools.combinations(self.handContour, 3)
+        def distanceCheck(points):
+            A = points[0][0]
+            B = points[1][0]
+            C = points[2][0]
+            AB = np.linalg.norm(A - B)
+            if not(minDistance < AB < maxDistance): return None
+            BC = np.linalg.norm(B - C)
+            if not(minDistance < BC < maxDistance): return None
+            CA = np.linalg.norm(C - A)
+            if not(minDistance < CA < maxDistance): return None
+            return np.array([A, B, C])
+        a = [distanceCheck(i) for i in iter]
+        # for i in xrange(0, len(self.handContour) - 2):
+        #     for j in xrange(i + 1, len(self.handContour) - 1):
+        #         for k in xrange(j + 1, len(self.handContour)):
+        #             I = self.handContour[i][0]
+        #             J = self.handContour[j][0]
+        #             K = self.handContour[k][0]
+        #             # IJ = Gesture.distance(I, J)
+        #             # JK = Gesture.distance(J, K)
+        #             # KI = Gesture.distance(K, I)
+        #             # if (IJ < minDistance or JK < minDistance or KI < minDistance or
+        #             #     IJ > maxDistance or JK > maxDistance or KI > maxDistance):
+        #             #     continue
+        #             # else:
+        #             #     self.testPoints.append((I, J, K))
+        print time.time() - startTime
+
+
+
     # Currently just finds the largest contour,
     # Should be able to replace this with a "matching" algorithm from here:
     # http://docs.opencv.org/trunk/doc/py_tutorials/py_imgproc/py_contours/
@@ -112,8 +150,13 @@ class GestureProcessor(object):
             if area > maxArea:
                 maxArea = area
                 index = i
-        self.handContour = self.contours[index]
-
+        self.realHandContour = self.contours[index]
+        # reduce hand contour to manageable number of points
+        # Thanks to http://opencvpython.blogspot.com/2012/06/contours-2-brotherhood.html
+        self.realHandLen = cv2.arcLength(self.realHandContour, True)
+        self.handContour = cv2.approxPolyDP(self.realHandContour, 0.001 * self.realHandLen, True)
+        print len(self.handContour)
+        self.setPalmCombinations()
         self.hullHandContour = cv2.convexHull(self.handContour,
                                                 returnPoints = False)
         self.hullPoints = [self.handContour[i[0]] for i in self.hullHandContour]
@@ -349,11 +392,11 @@ class GestureProcessor(object):
                 cv2.circle(self.drawingCanvas, self.recentPositions[i], 5, (255, 25*i, 25*i), -1)
 
     def drawCircles(self):
-        # for i in xrange(len(self.centerCandidates)-1, len(self.centerCandidates)-1-min(len(self.centerCandidates), 10), -1):
-        #     cv2.circle(self.drawingCanvas, (self.centerCandidates[i][1], self.centerCandidates[i][2]), self.centerCandidates[i][0], (255, 0, 255), 3)
-        #     cv2.circle(self.drawingCanvas, (self.centerCandidates[i][1], self.centerCandidates[i][2]), 2, (255, 0, 255), -1)
-        cv2.circle(self.drawingCanvas, tuple(self.centerAvg), self.radAvg, (255, 0, 255), 3)
-        cv2.circle(self.drawingCanvas, tuple(self.centerAvg), 10, (255, 0, 255), -1)
+        for i in xrange(len(self.centerCandidates)-1, len(self.centerCandidates)-1-min(len(self.centerCandidates), 10), -1):
+            cv2.circle(self.drawingCanvas, (self.centerCandidates[i][1], self.centerCandidates[i][2]), self.centerCandidates[i][0], (255, 0, 255), 3)
+            cv2.circle(self.drawingCanvas, (self.centerCandidates[i][1], self.centerCandidates[i][2]), 2, (255, 0, 255), -1)
+        # cv2.circle(self.drawingCanvas, tuple(self.centerAvg), self.radAvg, (255, 0, 255), 3)
+        # cv2.circle(self.drawingCanvas, tuple(self.centerAvg), 10, (255, 0, 255), -1)
 
     def drawHandContour(self, bubbles = False):
         cv2.drawContours(self.drawingCanvas, [self.handContour], 0, (0, 255, 0), 1)
@@ -373,7 +416,7 @@ class GestureProcessor(object):
                 defectPoints.append(self.handContour[i[0][2]])
         defectPoints = np.array(defectPoints, dtype = np.int32)
         if bubbles:
-            self.drawBubbles(defectPoints, (0, 0, 255), width = 4)
+            self.drawBubbles(defectPoints, (0, 0, 255), width = 10)
 
     def drawBubbles(self, pointsList, color = (255, 255, 255), width = 2):
         for i in xrange(len(pointsList)):
