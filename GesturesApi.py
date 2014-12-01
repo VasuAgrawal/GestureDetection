@@ -7,6 +7,7 @@ from gesture import Gesture
 import random
 import itertools
 from line import Line
+from scipy.spatial.distance import pdist, squareform
 
 class GestureProcessor(object):
     def __init__(self, gestureFile = "gestureData.txt"):
@@ -107,7 +108,6 @@ class GestureProcessor(object):
         # distance between points. 10 and 100 should be reasonable cutoffs.
         minDistance = 10
         maxDistance = 100
-        startTime = time.time()
         iter = itertools.combinations(self.handContour, 3)
         def distanceCheck(points):
             A = points[0][0]
@@ -121,23 +121,33 @@ class GestureProcessor(object):
             if not(minDistance < CA < maxDistance): return None
             return np.array([A, B, C])
         a = [distanceCheck(i) for i in iter]
-        # for i in xrange(0, len(self.handContour) - 2):
-        #     for j in xrange(i + 1, len(self.handContour) - 1):
-        #         for k in xrange(j + 1, len(self.handContour)):
-        #             I = self.handContour[i][0]
-        #             J = self.handContour[j][0]
-        #             K = self.handContour[k][0]
-        #             # IJ = Gesture.distance(I, J)
-        #             # JK = Gesture.distance(J, K)
-        #             # KI = Gesture.distance(K, I)
-        #             # if (IJ < minDistance or JK < minDistance or KI < minDistance or
-        #             #     IJ > maxDistance or JK > maxDistance or KI > maxDistance):
-        #             #     continue
-        #             # else:
-        #             #     self.testPoints.append((I, J, K))
-        print time.time() - startTime
 
+    # Taken directly from a question I asked here:
+    # http://stackoverflow.com/questions/27212270/how-to-speedup-checking-
+    # every-possible-combination-python-numpy
+    def setPalmCombinations(self, points, distMin=50, distMax=200):
+        dists = pdist(points)
+        # This matrix lists the distance between each pair of nodes 
+        # (represented by their column and row index, so that the mat[i,j] 
+        # represents the distance between points[i,:], points[j,:])
+        mat = squareform(dists)
+        mask = (mat > distMin) & (mat < distMax)
 
+        two_good_legs = {}  # store all combinations of point indices where "two legs" of the triangles have a distance that matches the spec.
+        myinds = []
+        for rowind, row in enumerate(mask):
+            relevant = row[rowind+1:]  # distance to a point itself is always zero, hence exclude from list
+            inds = np.where(relevant)[0] + (rowind+1)
+            myinds.append(inds)
+            two_good_legs[rowind] = list(itertools.combinations(inds, 2))
+
+        triangles = []
+        # The only thing left to do now is to check if the third leg's norm is also within spec.
+        for k,v in two_good_legs.items():
+            for tup in v:
+                if tup[1] in myinds[tup[0]]:
+                    triangles.append((k, tup[0], tup[1]))
+        return triangles
 
     # Currently just finds the largest contour,
     # Should be able to replace this with a "matching" algorithm from here:
@@ -155,8 +165,8 @@ class GestureProcessor(object):
         # Thanks to http://opencvpython.blogspot.com/2012/06/contours-2-brotherhood.html
         self.realHandLen = cv2.arcLength(self.realHandContour, True)
         self.handContour = cv2.approxPolyDP(self.realHandContour, 0.001 * self.realHandLen, True)
-        print len(self.handContour)
-        self.setPalmCombinations()
+        print len(self.handContour), "Contour Length"
+        # self.setPalmCombinations()
         self.hullHandContour = cv2.convexHull(self.handContour,
                                                 returnPoints = False)
         self.hullPoints = [self.handContour[i[0]] for i in self.hullHandContour]
@@ -168,7 +178,8 @@ class GestureProcessor(object):
         self.setHandDimensions()
         self.findHandCenter()
         self.handMomentPositions += [self.handMoment]
-        self.handCenterPositions += [tuple(self.centerAvg)]
+        self.handCenterPositions += [self.handMoment]
+        # self.handCenterPositions += [tuple(self.centerAvg)]
         if len(self.handCenterPositions) > 10:
             self.canDoGestures = True
         else: self.canDoGestures = False
@@ -182,37 +193,52 @@ class GestureProcessor(object):
         self.handYCenterMoment = int(self.handMoments["m01"]/
                                         self.handMoments["m00"])
         self.handMoment = (self.handXCenterMoment, self.handYCenterMoment)
-        defectPoints = []
-        minDistance = 500
-        for i in self.defects:
-            if i[0][3] > minDistance:
-                defectPoints.append(self.handContour[i[0][2]])
-        defectPoints = np.array(defectPoints, dtype = np.int32)
-        combinations = itertools.combinations(defectPoints, 3) # make a triangle
-        # combinations = itertools.combinations(self.hullPoints, 3)
-        self.centerCandidates = []
-        self.centerAvg = [0, 0]
-        self.radAvg = 0
-        circleNum = 0
-        for combination in combinations:
-            tPoints = []
-            for point in combination:
-                tPoints.extend(point)
-            circle = self.maxInscribedCircle(np.array(tPoints))
-            if circle != None:
-                center, radius = circle
-            else:
-                continue
-            center = np.array(center)
-            if center[0] >= self.minX and center[0] <= self.minX + self.handWidth and center[1] >= self.minY and center[1] <= self.minY + self.handHeight and radius * 2 < min(self.handWidth, self.handHeight):
-                self.centerCandidates.append(np.array([radius, center[0], center[1]], dtype=np.int32))
-                self.centerAvg = [weightedAvg(self.centerAvg[0], center[0], circleNum), weightedAvg(self.centerAvg[1], center[1], circleNum)]
-                self.radAvg = weightedAvg(self.radAvg, radius, circleNum)
-                circleNum += 1
-        if len(self.handMomentPositions) > 0:
-            if Gesture.distance(self.handMoment, self.handMomentPositions[-1]) < 5.0:
-                # staying roughly in place, so only chage the new one by small fraction
-                self.centerAvg = [weightedAvg(self.handCenterPositions[-1][0], self.centerAvg[0], 10), weightedAvg(self.handCenterPositions[-1][1], self.centerAvg[1], 100)]
+
+        startTime = time.time()
+        # # Taken fron here: http://stackoverflow.com/questions/27212270/
+        # # how-to-speedup-checking-every-possible-combination-python-numpy
+        triangles = self.setPalmCombinations(self.handContour[:,0], 
+            distMin=min(self.handWidth, self.handHeight) * 0.5,
+            distMax=min(self.handWidth, self.handHeight) * 0.8)
+        coords = self.handContour[:,0][triangles,:]
+
+        self.inscribed = []
+        for points in coords:
+            self.inscribed.append(self.maxInscribedCircle(points))
+
+        self.inscribed.sort(key=lambda (r, c): r)
+
+        # defectPoints = []
+        # minDistance = 500
+        # for i in self.defects:
+        #     if i[0][3] > minDistance:
+        #         defectPoints.append(self.handContour[i[0][2]])
+        # defectPoints = np.array(defectPoints, dtype = np.int32)
+        # combinations = itertools.combinations(defectPoints, 3) # make a triangle
+        # # combinations = itertools.combinations(self.hullPoints, 3)
+        # self.centerCandidates = []
+        # self.centerAvg = [0, 0]
+        # self.radAvg = 0
+        # circleNum = 0
+        # for combination in combinations:
+        #     tPoints = []
+        #     for point in combination:
+        #         tPoints.extend(point)
+        #     circle = self.maxInscribedCircle(np.array(tPoints))
+        #     if circle != None:
+        #         center, radius = circle
+        #     else:
+        #         continue
+        #     center = np.array(center)
+        #     if center[0] >= self.minX and center[0] <= self.minX + self.handWidth and center[1] >= self.minY and center[1] <= self.minY + self.handHeight and radius * 2 < min(self.handWidth, self.handHeight):
+        #         self.centerCandidates.append(np.array([radius, center[0], center[1]], dtype=np.int32))
+        #         self.centerAvg = [weightedAvg(self.centerAvg[0], center[0], circleNum), weightedAvg(self.centerAvg[1], center[1], circleNum)]
+        #         self.radAvg = weightedAvg(self.radAvg, radius, circleNum)
+        #         circleNum += 1
+        # if len(self.handMomentPositions) > 0:
+        #     if Gesture.distance(self.handMoment, self.handMomentPositions[-1]) < 5.0:
+        #         # staying roughly in place, so only chage the new one by small fraction
+        #         self.centerAvg = [weightedAvg(self.handCenterPositions[-1][0], self.centerAvg[0], 10), weightedAvg(self.handCenterPositions[-1][1], self.centerAvg[1], 100)]
 
 
     def analyzeHandCenter(self):
@@ -241,7 +267,7 @@ class GestureProcessor(object):
             elif AC.pslope == Line.inf:
                 center[0] = AC.midpoint[0]
                 center[1] = AB.pslope * center[0] - AB.pslope * AB.midpoint[0] + AB.midpoint[1]
-            return np.array(center, dtype = np.int32), int(Line.distance(center, points[0]))
+            return int(Line.distance(center, points[0])), np.array(center, dtype = np.int32)
         else:
             return None
 
@@ -392,11 +418,14 @@ class GestureProcessor(object):
                 cv2.circle(self.drawingCanvas, self.recentPositions[i], 5, (255, 25*i, 25*i), -1)
 
     def drawCircles(self):
-        for i in xrange(len(self.centerCandidates)-1, len(self.centerCandidates)-1-min(len(self.centerCandidates), 10), -1):
-            cv2.circle(self.drawingCanvas, (self.centerCandidates[i][1], self.centerCandidates[i][2]), self.centerCandidates[i][0], (255, 0, 255), 3)
-            cv2.circle(self.drawingCanvas, (self.centerCandidates[i][1], self.centerCandidates[i][2]), 2, (255, 0, 255), -1)
-        # cv2.circle(self.drawingCanvas, tuple(self.centerAvg), self.radAvg, (255, 0, 255), 3)
-        # cv2.circle(self.drawingCanvas, tuple(self.centerAvg), 10, (255, 0, 255), -1)
+        for i in self.inscribed:
+            if i[0] < min(self.handWidth, self.handHeight) * 0.4:
+                cv2.circle(self.drawingCanvas, tuple(i[1]), i[0], (255, 0, 255), 2)
+        # for i in xrange(len(self.centerCandidates)-1, len(self.centerCandidates)-1-min(len(self.centerCandidates), 10), -1):
+        #     cv2.circle(self.drawingCanvas, (self.centerCandidates[i][1], self.centerCandidates[i][2]), self.centerCandidates[i][0], (255, 0, 255), 3)
+        #     cv2.circle(self.drawingCanvas, (self.centerCandidates[i][1], self.centerCandidates[i][2]), 2, (255, 0, 255), -1)
+        # # cv2.circle(self.drawingCanvas, tuple(self.centerAvg), self.radAvg, (255, 0, 255), 3)
+        # # cv2.circle(self.drawingCanvas, tuple(self.centerAvg), 10, (255, 0, 255), -1)
 
     def drawHandContour(self, bubbles = False):
         cv2.drawContours(self.drawingCanvas, [self.handContour], 0, (0, 255, 0), 1)
