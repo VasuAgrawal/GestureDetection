@@ -21,15 +21,8 @@ class GestureDemo(EventBasedAnimationClass):
     def bindGestures(self):
         def fn(): print "HELLO IM YELLOW"
         self.gp.gestures[0].action = fn
-        def fn(): print "EHLLO I'm PURPLSE"
+        def fn(): print "Some other FN"
         self.gp.bind(0, fn)
-        # print self.gp.getGestureNames()
-        # def action():
-        #     return "LOOK I'M WORKING FROM TKINTER"
-        # for i in xrange(len(self.gp.gestures)):
-        #     def fn():
-        #         print action() + self.gp.gestures[i].name
-        #     self.gp.bind(i, fn)
 
     def onMousePressed(self, event):
         print "You could probably do something with the coords:", (event.x, event.y)
