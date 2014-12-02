@@ -149,6 +149,21 @@ class GestureProcessor(object):
                     triangles.append((k, tup[0], tup[1]))
         return triangles
 
+    def centerByReduction(self):
+        scaleFactor = 0.3
+        shrunk = np.array(self.handContour * scaleFactor, dtype = np.int32)
+        tx, ty, w, h = cv2.boundingRect(shrunk)
+        print tx, ty, w, h
+        maxPoint = None
+        maxRadius = 0
+        for x in xrange(w):
+            for y in xrange(h):
+                rad = cv2.pointPolygonTest(shrunk, (tx + x, ty + y), True)
+                if rad > maxRadius:
+                    maxPoint = (tx + x, ty + y)
+                    maxRadius = rad
+        return np.array(np.array(maxPoint) / scaleFactor, dtype = np.int32)
+
     # Currently just finds the largest contour,
     # Should be able to replace this with a "matching" algorithm from here:
     # http://docs.opencv.org/trunk/doc/py_tutorials/py_imgproc/py_contours/
@@ -198,13 +213,27 @@ class GestureProcessor(object):
         # # Taken fron here: http://stackoverflow.com/questions/27212270/
         # # how-to-speedup-checking-every-possible-combination-python-numpy
         triangles = self.setPalmCombinations(self.handContour[:,0], 
-            distMin=min(self.handWidth, self.handHeight) * 0.5,
-            distMax=min(self.handWidth, self.handHeight) * 0.8)
+            distMin=min(self.handWidth, self.handHeight) * 0.2,
+            distMax=min(self.handWidth, self.handHeight) * 1)
         coords = self.handContour[:,0][triangles,:]
 
         self.inscribed = []
-        for points in coords:
-            self.inscribed.append(self.maxInscribedCircle(points))
+
+        iter = np.linspace(0, len(coords), min(len(coords), 200), endpoint=False)
+
+        for i in iter:
+            index = int(i)
+            radius, circle = self.maxInscribedCircle(coords[index])
+            if radius != None:
+                dirs = np.array([[1, 0], [0, 1], [-1, 0], [0, -1]])
+                inside = True
+                for direction in dirs:
+                    pt = circle + radius * direction
+                    if cv2.pointPolygonTest(self.handContour, tuple(pt), False) < 0:
+                        inside = False
+                        break
+                if inside:
+                    self.inscribed.append(self.maxInscribedCircle(coords[index]))
 
         self.inscribed.sort(key=lambda (r, c): r)
 
@@ -269,7 +298,7 @@ class GestureProcessor(object):
                 center[1] = AB.pslope * center[0] - AB.pslope * AB.midpoint[0] + AB.midpoint[1]
             return int(Line.distance(center, points[0])), np.array(center, dtype = np.int32)
         else:
-            return None
+            return None, None
 
     def setHandDimensions(self):
         self.minX, self.minY, self.handWidth, self.handHeight = cv2.boundingRect(self.handContour)
@@ -421,6 +450,9 @@ class GestureProcessor(object):
         for i in self.inscribed:
             if i[0] < min(self.handWidth, self.handHeight) * 0.4:
                 cv2.circle(self.drawingCanvas, tuple(i[1]), i[0], (255, 0, 255), 2)
+        center = self.centerByReduction()
+        rad = cv2.pointPolygonTest(self.handContour, tuple(center), True)
+        cv2.circle(self.drawingCanvas, tuple(center), int(rad), (0, 255, 0), 10)
         # for i in xrange(len(self.centerCandidates)-1, len(self.centerCandidates)-1-min(len(self.centerCandidates), 10), -1):
         #     cv2.circle(self.drawingCanvas, (self.centerCandidates[i][1], self.centerCandidates[i][2]), self.centerCandidates[i][0], (255, 0, 255), 3)
         #     cv2.circle(self.drawingCanvas, (self.centerCandidates[i][1], self.centerCandidates[i][2]), 2, (255, 0, 255), -1)
@@ -429,6 +461,7 @@ class GestureProcessor(object):
 
     def drawHandContour(self, bubbles = False):
         cv2.drawContours(self.drawingCanvas, [self.handContour], 0, (0, 255, 0), 1)
+        cv2.drawContours(self.drawingCanvas, [np.array(self.handContour * 0.4, dtype = np.int32)], 0, (0, 255, 0), 1)
         if bubbles:
             self.drawBubbles(self.handContour, (255, 255, 0))
 
