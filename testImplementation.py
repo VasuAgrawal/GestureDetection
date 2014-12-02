@@ -64,6 +64,7 @@ class GestureDemo(EventBasedAnimationClass):
         self.canvas.create_image(1920, 1080, image=imgtk2, anchor="se")
 
         self.canvas.create_text(1920, 0, text=self.gp.lastAction, anchor="ne", font = "15")
+        self.canvas.create_text(1920, 20, text="Distance: " + str(round(self.gp.handDistance, 3)), anchor="ne", font = "15")
 
     def run(self):
         super(GestureDemo, self).run()
