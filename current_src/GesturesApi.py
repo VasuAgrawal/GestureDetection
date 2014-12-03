@@ -39,6 +39,7 @@ class GestureProcessor(object):
 
     def loadGesturesFromFile(self):
         self.gestures = []
+        self.gestureNames = []
         read = ""
         with open(self.gestureFile, 'r') as fin:
             read = fin.read()
@@ -56,6 +57,7 @@ class GestureProcessor(object):
                     gestureName = item[cutoff:]
                 elif item == self.gestureEnd:
                     self.gestures.append(Gesture(gesturePoints, gestureName))
+                    self.gestureNames.append(gestureName)
                     gestureName = ""
                     gesturePoints = []
                 else:
@@ -66,7 +68,20 @@ class GestureProcessor(object):
         self.gestures = defaultGesturesLoader.defaultGestures
 
     def bind(self, gestureIndex, fn):
-        self.gestures[gestureIndex].action = fn
+        if type(gestureIndex) == int:
+            if gestureIndex < len(self.gestures):
+                self.gestures[gestureIndex].action = fn
+                return True
+            else:
+                raise IndexError("Gesture Index Out Of Bounds")
+        elif type(gestureIndex) == str:
+            if gestureIndex in self.gestureNames:
+                self.gestures[self.gestureNames.index(gestureIndex)].action = fn
+                return True
+            else:
+                raise IndexError("Gesture Name Not Found")
+        else:
+            raise TypeError("Unsupported Key Type")
 
     def getGestureNames(self):
         return [gesture.name for gesture in self.gestures]
@@ -310,9 +325,22 @@ class GestureProcessor(object):
         self.lastAction = gestureName
         return gestureName
 
+    def getScaledCenter(self):
+        return (self.palmCenter / np.array([self.cameraWidth, self.cameraHeight], dtype = np.float32)).round(3)
+
 # ---------------------------------- Graphics ----------------------------------
 # Functions associated with being able to draw the data in a human friendly
 # way. Necessary to be able to see data in an external program.
+    
+    @staticmethod
+    def getRGBAFromBGR(image, width, height):
+        resized = cv2.resize(image, (width, height))
+        return cv2.cvtColor(resized, cv2.COLOR_BGR2RGBA)
+
+    @staticmethod
+    def getRGBAFromGray(image, width, height):
+        resized = cv2.resize(image, (width, height))
+        return cv2.cvtColor(resized, cv2.COLOR_GRAY2RGBA)
 
     def getRGBAThresh(self, widthScale=1, heightScale=1):
         if widthScale != 1 or heightScale != 1:
@@ -323,17 +351,16 @@ class GestureProcessor(object):
 
     def getRGBAOriginal(self, widthScale=1, heightScale=1):
         if widthScale != 1 or heightScale != 1:
-            resized = cv2.resize(self.thresholded, (480, 320))
+            resized = cv2.resize(self.original, (480, 320))
             return cv2.cvtColor(resized, cv2.COLOR_BGR2RGBA)
         return cv2.cvtColor(self.original, cv2.COLOR_BGR2RGBA)
 
     def getRGBACanvas(self, widthScale=1, heightScale=1):
         if widthScale != 1 or heightScale != 1:
-            resized = cv2.resize(self.thresholded, (0, 0), fx=widthScale,
+            resized = cv2.resize(self.drawingCanvas, (0, 0), fx=widthScale,
                                     fy=heightScale)
             return cv2.cvtColor(resized, cv2.COLOR_BGR2RGBA)
         return cv2.cvtColor(self.drawingCanvas, cv2.COLOR_BGR2RGBA)
-
 
     def drawCenter(self):
         cv2.circle(self.drawingCanvas, tuple(self.palmCenter), 10, (255, 0, 0), -2)

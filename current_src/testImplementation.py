@@ -4,25 +4,76 @@ from GesturesApi import GestureProcessor
 from PIL import Image, ImageTk
 # http://stackoverflow.com/questions/16366857/show-webcam-sequence-tkinter
 
+class Smiley(object):
+    def __init__(self, x, y, radius=50, image=None):
+        self.x = x
+        self.y = y
+        self.radius = radius
+        self.handles = []
+        self.image = image
+        self.clearImage = True
+        self.initImage()
+
+    # Adapted from the following link:
+    # http://stackoverflow.com/questions/4066202/resizing-pictures-in-pil-in-tkinter
+    def initImage(self):
+        if self.image != None:
+            self.image = Image.open(self.image)
+            self.image = self.image.resize((self.radius * 2, self.radius * 2), Image.ANTIALIAS)
+            self.imageTk = ImageTk.PhotoImage(self.image)
+
+    def drawSmiley(self, canvas):
+        if self.clearImage:
+            self.delete(canvas)
+        if self.image == None:
+            self.handles.append(canvas.create_oval(self.x - self.radius, self.y - self.radius, self.x + self.radius, self.y + self.radius, fill="yellow"))
+            eyeRad = self.radius / 5
+            self.handles.append(canvas.create_oval(self.x - self.radius / 2, self.y - self.radius / 2, self.x - self.radius / 2 + eyeRad, self.y - self.radius / 2 + eyeRad, fill="black"))
+        else:
+            self.handles.append(canvas.create_image(self.x, self.y, image=self.imageTk, anchor = "center"))
+
+    def delete(self, canvas):
+        for handle in self.handles:
+            canvas.delete(handle)
+        self.handles = []
 
 class GestureDemo(EventBasedAnimationClass):
     def __init__(self):
         self.gp = GestureProcessor("Somefile.txt") # will default to usual file
-        super(GestureDemo, self).__init__(width=1920, height=1080)
-        # super(GestureDemo, self).__init__(width=self.gp.cameraWidth,
-        #                                     height=self.gp.cameraHeight)
+        self.width = 1920
+        self.height = 1080
+        super(GestureDemo, self).__init__(width=self.width, height=self.height)
         self.timerDelay = 1000 / 30 # 30 FPS
         self.bindGestures()
-        # def fn(): print "HELLO IM YELLOW"
-        # self.gp.gestures[0].action = fn
-        # def fn(): print "EHLLO I'm PURPLSE"
-        # self.gp.bind(0, fn)
+        self.CVHandles = []
+        self.bgHandle = None
+        self.trackCenter = False
+        self.showSmiley = False
+        self.showLukas = False
+        self.trail = False
+
+    def initAnimation(self):
+        self.smiley = Smiley(self.width * 3 / 4, self.height / 4)
+        self.lukas = Smiley(self.width * 3 / 4, self.height / 4, image="lbp.jpg")
+        self.drawBG()
+
+    def drawSmiley(self):
+        self.showSmiley = not self.showSmiley
+        self.showLukas = False
+        # self.smiley.delete(self.lukas)
+
+    def drawLukas(self):
+        self.showLukas = not self.showLukas
+        self.showSmiley = False
+        # self.smiley.delete(self.canvas)
 
     def bindGestures(self):
-        def fn(): print "HELLO IM YELLOW"
-        self.gp.gestures[0].action = fn
-        def fn(): print "Some other FN"
-        self.gp.bind(0, fn)
+        self.gp.bind("Infinity", lambda: self.drawLukas())
+        self.gp.bind("Horizontal Line Right to Left", lambda: self.drawSmiley())
+
+    def bindHandlers(self):
+        self.root.bind("<KeyPress>", lambda event: self.onKeyDown(event))
+        self.root.bind("<KeyRelease>", lambda event: self.onKeyUp(event))
 
     def onMousePressed(self, event):
         print "You could probably do something with the coords:", (event.x, event.y)
@@ -30,34 +81,66 @@ class GestureDemo(EventBasedAnimationClass):
     def onKeyPressed(self, event):
         if event.char == 'r':
             self.gp.saveNext()
+        elif event.char == 's':
+            self.trackCenter = not self.trackCenter
+        elif event.char == 'c':
+            self.trail = not self.trail
         elif event.char == 'q':
             self.onClose()
             exit()
 
     def onTimerFired(self):
         self.gp.process()
+        self.updateSmiley()
 
-    # This is terrible code and I should really come up with a better way of doing this
-    def redrawAll(self):
-        self.canvas.delete(ALL)
-        cv2image = self.gp.getRGBAOriginal()
-        imgtk = ImageTk.PhotoImage(image=Image.fromarray(cv2image))
-        self.imagetk = imgtk # Need this for persistence because of garbage collection
-        self.canvas.create_image(0, 0, image=imgtk, anchor="nw")
+    def updateSmiley(self):
+        if self.trackCenter:
+            self.smiley.x = int((self.gp.getScaledCenter()[0] + 1) * (self.width / 2))
+            self.smiley.y = int((self.gp.getScaledCenter()[1]) * (self.height / 2))
+            self.smiley.radius = int(self.gp.handDistance) * 2
+            self.lukas.x = int((self.gp.getScaledCenter()[0] + 1) * (self.width / 2))
+            self.lukas.y = int((self.gp.getScaledCenter()[1]) * (self.height / 2))
+        if self.trail:
+            self.smiley.clearImage = False
+            self.lukas.clearImage = False
+        else:
+            self.lukas.clearImage = True
+            self.smiley.clearImage = True
 
-        cv2image = self.gp.getRGBAThresh(.75, .75)
-        imgtk3 = ImageTk.PhotoImage(image=Image.fromarray(cv2image))
-        self.imagetk3 = imgtk3 # Need this for persistence because of garbage collection
-        self.canvas.create_image(0, 1080, image=imgtk3, anchor="sw")
+
+    # http://stackoverflow.com/questions/16366857/show-webcam-sequence-tkinter
+    def drawCVImages(self):
+        for handle in self.CVHandles:
+            self.canvas.delete(handle)
+        self.CVHandles = []
+
+        cv2image = GestureProcessor.getRGBAFromBGR(self.gp.original, self.width / 2, self.height / 2)
+        self.imagetk = ImageTk.PhotoImage(image=Image.fromarray(cv2image))
 
         self.gp.draw()
-        cv2image = self.gp.getRGBACanvas()
-        imgtk2 = ImageTk.PhotoImage(image=Image.fromarray(cv2image))
-        self.imagetk2 = imgtk2 # Need this for persistence because of garbage collection
-        self.canvas.create_image(1920, 1080, image=imgtk2, anchor="se")
+        cv2image = GestureProcessor.getRGBAFromBGR(self.gp.drawingCanvas, self.width / 2, self.height / 2)
+        self.imagetk2 = ImageTk.PhotoImage(image=Image.fromarray(cv2image))
 
-        self.canvas.create_text(1920, 0, text=self.gp.lastAction, anchor="ne", font = "15")
-        self.canvas.create_text(1920, 20, text="Distance: " + str(round(self.gp.handDistance, 3)), anchor="ne", font = "15")
+        cv2image = GestureProcessor.getRGBAFromGray(self.gp.thresholded, self.width / 2, self.height / 2)
+        self.imagetk3 = ImageTk.PhotoImage(image=Image.fromarray(cv2image))
+
+        self.CVHandles.append(self.canvas.create_image(0, 0, image=self.imagetk, anchor="nw"))
+        self.CVHandles.append(self.canvas.create_image(1920, 1080, image=self.imagetk2, anchor="se"))
+        self.CVHandles.append(self.canvas.create_image(0, 1080, image=self.imagetk3, anchor="sw"))
+
+        self.CVHandles.append(self.canvas.create_text(1920, 0, text=self.gp.lastAction, anchor="ne", font = "15"))
+        self.CVHandles.append(self.canvas.create_text(1920, 20, text="Distance: " + str(round(self.gp.handDistance, 3)), anchor="ne", font = "15"))
+        self.CVHandles.append(self.canvas.create_text(1920, 40, text=str(self.gp.getScaledCenter()), anchor = "ne", font = "15"))
+
+    def drawBG(self):
+        self.bgHandle = self.canvas.create_rectangle(self.width/2, 0, self.width, self.height/2, fill = "white")
+
+    def redrawAll(self):
+        self.drawCVImages()
+        if self.showSmiley:
+            self.smiley.drawSmiley(self.canvas)
+        elif self.showLukas:
+            self.lukas.drawSmiley(self.canvas)
 
     def run(self):
         super(GestureDemo, self).run()

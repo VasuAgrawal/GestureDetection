@@ -124,5 +124,4 @@ class Gesture(object):
         # Subsequent distances form indices
 
     def action(self, *args, **kwargs):
-        print "DEFAULT ACTION:", 
-        print self.name
+        print "DEFAULT ACTION:", self.name
