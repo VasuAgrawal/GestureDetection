@@ -58,14 +58,12 @@ class GestureDemo(EventBasedAnimationClass):
         self.drawBG()
 
     def drawSmiley(self):
-        self.showSmiley = not self.showSmiley
+        self.showSmiley = True
         self.showLukas = False
-        # self.smiley.delete(self.lukas)
 
     def drawLukas(self):
-        self.showLukas = not self.showLukas
+        self.showLukas = True
         self.showSmiley = False
-        # self.smiley.delete(self.canvas)
 
     def bindGestures(self):
         self.gp.bind("Infinity", lambda: self.drawLukas())
@@ -85,6 +83,9 @@ class GestureDemo(EventBasedAnimationClass):
             self.trackCenter = not self.trackCenter
         elif event.char == 'c':
             self.trail = not self.trail
+        elif event.char == 'd':
+            self.canvas.delete(ALL)
+            self.drawBG()
         elif event.char == 'q':
             self.onClose()
             exit()
@@ -106,7 +107,6 @@ class GestureDemo(EventBasedAnimationClass):
         else:
             self.lukas.clearImage = True
             self.smiley.clearImage = True
-
 
     # http://stackoverflow.com/questions/16366857/show-webcam-sequence-tkinter
     def drawCVImages(self):

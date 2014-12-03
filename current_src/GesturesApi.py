@@ -66,6 +66,9 @@ class GestureProcessor(object):
     # Initiate some default gesures in the event that no gesture file was found
     def loadDefaultGestures(self):
         self.gestures = defaultGesturesLoader.defaultGestures
+        self.gestureNames = []
+        for gesture in self.gestures:
+            self.gestureNames.append(gesture.name)
 
     def bind(self, gestureIndex, fn):
         if type(gestureIndex) == int:
