@@ -60,10 +60,10 @@ The `process()` loop can be summarized as follows:
 8. Use the radius of the inscribed circle to approximate a distance
 9. Use the positions of the palm center between times when the hand is stationary to determine gestures
 10. Compare the list of points against all the template gestures:
-..1. Find the total distance of the tracked and template gestures
-..2. Determine how far along the total distance each point falls
-..3. For each point in the tracked gesture, look for the two template points which are closest to the fraction of the distance that the tracked point is
-..4. Linearize between the two template points to find a point to compare the tracked point to
-..5. Keep a running tally of the distance difference
-..6. Find which of the gestures has the lowest distance and see if it is lower than a reasonable threshold
+  1. Find the total distance of the tracked and template gestures
+  2. Determine how far along the total distance each point falls
+  3. For each point in the tracked gesture, look for the two template points which are closest to the fraction of the distance that the tracked point is
+  4. Linearize between the two template points to find a point to compare the tracked point to
+  5. Keep a running tally of the distance difference
+  6. Find which of the gestures has the lowest distance and see if it is lower than a reasonable threshold
 11. Initiate callback function if tracked gestures has matched a template
