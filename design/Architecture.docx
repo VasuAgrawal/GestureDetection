@@ -1,0 +1,51 @@
+﻿The program is broken into 4 different files, which can be found in current_src:
+
+testImplementation.py
+GesturesApi.py
+gesture.py
+defaultGesturesLoader.py
+
+In addition, the program uses a file taken from the 15-112 course notes:
+
+eventBasedAnimationClass.py
+
+Explanations for individual files are below:
+
+testImplementation.py:
+	Example code showing how to use the API
+	Creates 1 window with 4 quadrants
+		3 quadrants used for drawing API information
+		1 quadrant used as a canvas
+	Uses event based programming with Tkinter to draw smiley faces
+	Can use gestures to create and move smiley face
+	Contains methods to draw, handle events, and modify smiley faces
+	Run this file to see the example
+
+GesturesApi.py:
+	Contains the GestureProcessor object
+	Determines the hand's contour, center, and gesture
+	Loads a list of template Gesture objects which it compares against
+	Loads from either file or defaultGesturesLoader
+	Gets the camera feed and looks for Gestures
+	Calls each Gesture template's compare method
+	Decides which Gesture is matched, if any
+	Calls the appropriate gesture's callback
+	Provides methods for the programmer to display images
+
+gesture.py:
+	Contains the Gesture class
+	Each Gesture is a template containing many points
+	Has a static method to compare a given gesture to self
+	Contains callback to be called when gesture is detected
+
+defaultGesturesLoader.py
+	Generates the Gesture templates to be used by GesturesApi
+	Generated upon import, simply need to access internal variable
+
+eventBasedAnimationClass.py:
+	Provides the basic functions and wrappers needed to make event based 			programming in Tkinter work
+	Used by CMU 15-112 students
+
+
+	
+
