@@ -154,6 +154,8 @@ class GestureProcessor(object):
         self.defects = cv2.convexityDefects(self.handContour,
                                             self.hullHandContour)
 
+    # Documentation:
+    # http://docs.opencv.org/doc/tutorials/imgproc/shapedescriptors/moments/moments.html
     def findCenterWithMoments(self):
         self.handMoments = cv2.moments(self.handContour)
         self.handXCenterMoment = int(self.handMoments["m10"] /

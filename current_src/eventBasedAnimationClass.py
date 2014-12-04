@@ -1,3 +1,5 @@
+# Taken directly from CMU 15112 Course notes:
+# http://www.cs.cmu.edu/~112/notes/eventBasedAnimationClass.py
 # eventBasedAnimationClass.py
 
 from Tkinter import *

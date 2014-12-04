@@ -2,6 +2,7 @@ from eventBasedAnimationClass import EventBasedAnimationClass
 from Tkinter import *
 from GesturesApi import GestureProcessor
 from PIL import Image, ImageTk
+# Import statements from: 
 # http://stackoverflow.com/questions/16366857/show-webcam-sequence-tkinter
 
 class Smiley(object):
@@ -29,6 +30,8 @@ class Smiley(object):
             self.handles.append(canvas.create_oval(self.x - self.radius, self.y - self.radius, self.x + self.radius, self.y + self.radius, fill="yellow"))
             eyeRad = self.radius / 5
             self.handles.append(canvas.create_oval(self.x - self.radius / 2, self.y - self.radius / 2, self.x - self.radius / 2 + eyeRad, self.y - self.radius / 2 + eyeRad, fill="black"))
+            self.handles.append(canvas.create_oval(self.x + self.radius / 2 - eyeRad, self.y - self.radius / 2, self.x + self.radius / 2, self.y - self.radius / 2 + eyeRad, fill="black"))
+            self.handles.append(canvas.create_arc(self.x - self.radius / 2, self.y - self.radius / 2, self.x + self.radius / 2, self.y + self.radius / 2, start=200, extent=140, style=ARC, width=self.radius / 10))
         else:
             self.handles.append(canvas.create_image(self.x, self.y, image=self.imageTk, anchor = "center"))
 
@@ -37,14 +40,17 @@ class Smiley(object):
             canvas.delete(handle)
         self.handles = []
 
+
+# Subclasses Object from here:
+# http://www.cs.cmu.edu/~112/notes/eventBasedAnimationClass.py
 class GestureDemo(EventBasedAnimationClass):
     def __init__(self):
-        self.gp = GestureProcessor("Somefile.txt") # will default to usual file
+        self.gp = GestureProcessor("Gesture_data.txt") # will default to usual file
         self.width = 1920
         self.height = 1080
         super(GestureDemo, self).__init__(width=self.width, height=self.height)
         self.timerDelay = 1000 / 30 # 30 FPS
-        self.bindGestures()
+        # self.bindGestures()
         self.CVHandles = []
         self.bgHandle = None
         self.trackCenter = False
@@ -60,14 +66,16 @@ class GestureDemo(EventBasedAnimationClass):
     def drawSmiley(self):
         self.showSmiley = True
         self.showLukas = False
+        self.lukas.delete(self.canvas)
 
     def drawLukas(self):
         self.showLukas = True
         self.showSmiley = False
+        self.smiley.delete(self.canvas)
 
     def bindGestures(self):
         self.gp.bind("Infinity", lambda: self.drawLukas())
-        self.gp.bind("Horizontal Line Right to Left", lambda: self.drawSmiley())
+        self.gp.bind("Diagonal Bottom Left to Top Right", lambda: self.drawSmiley())
 
     def bindHandlers(self):
         self.root.bind("<KeyPress>", lambda event: self.onKeyDown(event))
@@ -86,6 +94,8 @@ class GestureDemo(EventBasedAnimationClass):
         elif event.char == 'd':
             self.canvas.delete(ALL)
             self.drawBG()
+        elif event.char == 'b':
+            self.bindGestures()
         elif event.char == 'q':
             self.onClose()
             exit()
@@ -108,6 +118,7 @@ class GestureDemo(EventBasedAnimationClass):
             self.lukas.clearImage = True
             self.smiley.clearImage = True
 
+    # OpenCV Image drawing adapted from:
     # http://stackoverflow.com/questions/16366857/show-webcam-sequence-tkinter
     def drawCVImages(self):
         for handle in self.CVHandles:
