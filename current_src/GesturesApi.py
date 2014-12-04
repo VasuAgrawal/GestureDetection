@@ -155,7 +155,8 @@ class GestureProcessor(object):
                                             self.hullHandContour)
 
     # Documentation:
-    # http://docs.opencv.org/doc/tutorials/imgproc/shapedescriptors/moments/moments.html
+    # http://docs.opencv.org/doc/tutorials/imgproc/shapedescriptors/moments/
+    # moments.html
     def findCenterWithMoments(self):
         self.handMoments = cv2.moments(self.handContour)
         self.handXCenterMoment = int(self.handMoments["m10"] /
@@ -331,7 +332,9 @@ class GestureProcessor(object):
         return gestureName
 
     def getScaledCenter(self):
-        return (self.palmCenter / np.array([self.cameraWidth, self.cameraHeight], dtype = np.float32)).round(3)
+        return (self.palmCenter / np.array([self.cameraWidth,
+                                            self.cameraHeight],
+                                            dtype=np.float32)).round(3)
 
 # ---------------------------------- Graphics ----------------------------------
 # Functions associated with being able to draw the data in a human friendly
@@ -368,38 +371,45 @@ class GestureProcessor(object):
         return cv2.cvtColor(self.drawingCanvas, cv2.COLOR_BGR2RGBA)
 
     def drawCenter(self):
-        cv2.circle(self.drawingCanvas, tuple(self.palmCenter), 10, (255, 0, 0), -2)
+        cv2.circle(self.drawingCanvas, tuple(self.palmCenter),
+                   10, (255, 0, 0), -2)
         if len(self.recentPositions) != 0:
             for i in xrange(len(self.recentPositions)):
-                cv2.circle(self.drawingCanvas, self.recentPositions[i], 5, (255, 25*i, 25*i), -1)
+                cv2.circle(self.drawingCanvas, self.recentPositions[i], 5,
+                           (255, 25*i, 25*i), -1)
 
     def drawCircles(self):
-        cv2.circle(self.drawingCanvas, tuple(self.palmCenter), int(self.palmRadius), (0, 255, 0), 10)
+        cv2.circle(self.drawingCanvas, tuple(self.palmCenter),
+                   int(self.palmRadius), (0, 255, 0), 10)
 
     def drawHandContour(self, bubbles = False):
-        cv2.drawContours(self.drawingCanvas, [self.handContour], 0, (0, 255, 0), 1)
+        cv2.drawContours(self.drawingCanvas, [self.handContour],
+                         0, (0, 255, 0), 1)
         if bubbles:
             self.drawBubbles(self.handContour, (255, 255, 0))
 
     def drawHullContour(self, bubbles = False):
-        cv2.drawContours(self.drawingCanvas, [self.hullPoints], 0, (0, 0, 255), 2)
+        cv2.drawContours(self.drawingCanvas, [self.hullPoints], 0,
+                         (0, 0, 255), 2)
         if bubbles:
             self.drawBubbles(self.hullPoints, (255, 255, 255))
 
     def drawDefects(self, bubbles = False):
         defectPoints = []
         minDistance = 1000
-        for i in self.defects:
-            if i[0][3] > minDistance:
-                defectPoints.append(self.handContour[i[0][2]])
-        defectPoints = np.array(defectPoints, dtype = np.int32)
-        if bubbles:
-            self.drawBubbles(defectPoints, (0, 0, 255), width = 10)
+        if self.defects != None:
+            for i in self.defects:
+                if i[0][3] > minDistance:
+                    defectPoints.append(self.handContour[i[0][2]])
+            defectPoints = np.array(defectPoints, dtype=np.int32)
+            if bubbles:
+                self.drawBubbles(defectPoints, (0, 0, 255), width=10)
 
-    def drawBubbles(self, pointsList, color = (255, 255, 255), width = 2):
+    def drawBubbles(self, pointsList, color=(255, 255, 255), width=2):
         for i in xrange(len(pointsList)):
             for j in xrange(len(pointsList[i])):
-                cv2.circle(self.drawingCanvas, (pointsList[i][j][0], pointsList[i][j][1]), width, color)
+                cv2.circle(self.drawingCanvas, (pointsList[i][j][0],
+                           pointsList[i][j][1]), width, color)
 
     def draw(self):
         self.drawingCanvas = np.zeros(self.original.shape, np.uint8)

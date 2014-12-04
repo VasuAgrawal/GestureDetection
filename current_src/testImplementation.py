@@ -16,24 +16,43 @@ class Smiley(object):
         self.initImage()
 
     # Adapted from the following link:
-    # http://stackoverflow.com/questions/4066202/resizing-pictures-in-pil-in-tkinter
+    # http://stackoverflow.com/questions/4066202/
+    # resizing-pictures-in-pil-in-tkinter
     def initImage(self):
         if self.image != None:
             self.image = Image.open(self.image)
-            self.image = self.image.resize((self.radius * 2, self.radius * 2), Image.ANTIALIAS)
+            self.image = self.image.resize((self.radius * 2, self.radius * 2),
+                                           Image.ANTIALIAS)
             self.imageTk = ImageTk.PhotoImage(self.image)
 
     def drawSmiley(self, canvas):
         if self.clearImage:
             self.delete(canvas)
         if self.image == None:
-            self.handles.append(canvas.create_oval(self.x - self.radius, self.y - self.radius, self.x + self.radius, self.y + self.radius, fill="yellow"))
+            self.handles.append(canvas.create_oval(self.x - self.radius,
+                                self.y - self.radius, self.x + self.radius,
+                                self.y + self.radius, fill="yellow"))
             eyeRad = self.radius / 5
-            self.handles.append(canvas.create_oval(self.x - self.radius / 2, self.y - self.radius / 2, self.x - self.radius / 2 + eyeRad, self.y - self.radius / 2 + eyeRad, fill="black"))
-            self.handles.append(canvas.create_oval(self.x + self.radius / 2 - eyeRad, self.y - self.radius / 2, self.x + self.radius / 2, self.y - self.radius / 2 + eyeRad, fill="black"))
-            self.handles.append(canvas.create_arc(self.x - self.radius / 2, self.y - self.radius / 2, self.x + self.radius / 2, self.y + self.radius / 2, start=200, extent=140, style=ARC, width=self.radius / 10))
+            self.handles.append(canvas.create_oval(self.x - self.radius / 2,
+                                self.y - self.radius / 2,
+                                self.x - self.radius / 2 + eyeRad,
+                                self.y - self.radius / 2 + eyeRad,
+                                fill="black"))
+            self.handles.append(canvas.create_oval(
+                                self.x + self.radius / 2 - eyeRad,
+                                self.y - self.radius / 2,
+                                self.x + self.radius / 2,
+                                self.y - self.radius / 2 + eyeRad,
+                                fill="black"))
+            self.handles.append(canvas.create_arc(self.x - self.radius / 2,
+                                self.y - self.radius / 2,
+                                self.x + self.radius / 2,
+                                self.y + self.radius / 2,
+                                start=200, extent=140, style=ARC,
+                                width=self.radius / 10))
         else:
-            self.handles.append(canvas.create_image(self.x, self.y, image=self.imageTk, anchor = "center"))
+            self.handles.append(canvas.create_image(self.x, self.y,
+                                image=self.imageTk, anchor="center"))
 
     def delete(self, canvas):
         for handle in self.handles:
@@ -45,7 +64,7 @@ class Smiley(object):
 # http://www.cs.cmu.edu/~112/notes/eventBasedAnimationClass.py
 class GestureDemo(EventBasedAnimationClass):
     def __init__(self):
-        self.gp = GestureProcessor("Gesture_data.txt") # will default to usual file
+        self.gp = GestureProcessor("Gesture_data.txt")  # default to usual file
         self.width = 1920
         self.height = 1080
         super(GestureDemo, self).__init__(width=self.width, height=self.height)
@@ -60,7 +79,8 @@ class GestureDemo(EventBasedAnimationClass):
 
     def initAnimation(self):
         self.smiley = Smiley(self.width * 3 / 4, self.height / 4)
-        self.lukas = Smiley(self.width * 3 / 4, self.height / 4, image="lbp.jpg")
+        self.lukas = Smiley(self.width * 3 / 4, self.height / 4,
+                            image="lbp.jpg")
         self.drawBG()
 
     def drawSmiley(self):
@@ -75,14 +95,15 @@ class GestureDemo(EventBasedAnimationClass):
 
     def bindGestures(self):
         self.gp.bind("Infinity", lambda: self.drawLukas())
-        self.gp.bind("Diagonal Bottom Left to Top Right", lambda: self.drawSmiley())
+        self.gp.bind("Diagonal Bottom Left to Top Right",
+                     lambda: self.drawSmiley())
 
     def bindHandlers(self):
         self.root.bind("<KeyPress>", lambda event: self.onKeyDown(event))
         self.root.bind("<KeyRelease>", lambda event: self.onKeyUp(event))
 
     def onMousePressed(self, event):
-        print "You could probably do something with the coords:", (event.x, event.y)
+        print "Mouse Clicked at:", (event.x, event.y)
 
     def onKeyPressed(self, event):
         if event.char == 'r':
@@ -106,11 +127,15 @@ class GestureDemo(EventBasedAnimationClass):
 
     def updateSmiley(self):
         if self.trackCenter:
-            self.smiley.x = int((self.gp.getScaledCenter()[0] + 1) * (self.width / 2))
-            self.smiley.y = int((self.gp.getScaledCenter()[1]) * (self.height / 2))
+            self.smiley.x = int((self.gp.getScaledCenter()[0] + 1) *
+                                (self.width / 2))
+            self.smiley.y = int((self.gp.getScaledCenter()[1]) *
+                                (self.height / 2))
             self.smiley.radius = int(self.gp.handDistance) * 2
-            self.lukas.x = int((self.gp.getScaledCenter()[0] + 1) * (self.width / 2))
-            self.lukas.y = int((self.gp.getScaledCenter()[1]) * (self.height / 2))
+            self.lukas.x = int((self.gp.getScaledCenter()[0] + 1) *
+                                (self.width / 2))
+            self.lukas.y = int((self.gp.getScaledCenter()[1]) *
+                                (self.height / 2))
         if self.trail:
             self.smiley.clearImage = False
             self.lukas.clearImage = False
@@ -125,26 +150,44 @@ class GestureDemo(EventBasedAnimationClass):
             self.canvas.delete(handle)
         self.CVHandles = []
 
-        cv2image = GestureProcessor.getRGBAFromBGR(self.gp.original, self.width / 2, self.height / 2)
+        cv2image = GestureProcessor.getRGBAFromBGR(self.gp.original,
+                                                   self.width / 2,
+                                                   self.height / 2)
         self.imagetk = ImageTk.PhotoImage(image=Image.fromarray(cv2image))
 
         self.gp.draw()
-        cv2image = GestureProcessor.getRGBAFromBGR(self.gp.drawingCanvas, self.width / 2, self.height / 2)
+        cv2image = GestureProcessor.getRGBAFromBGR(self.gp.drawingCanvas,
+                                                   self.width / 2,
+                                                   self.height / 2)
         self.imagetk2 = ImageTk.PhotoImage(image=Image.fromarray(cv2image))
 
-        cv2image = GestureProcessor.getRGBAFromGray(self.gp.thresholded, self.width / 2, self.height / 2)
+        cv2image = GestureProcessor.getRGBAFromGray(self.gp.thresholded,
+                                                    self.width / 2,
+                                                    self.height / 2)
         self.imagetk3 = ImageTk.PhotoImage(image=Image.fromarray(cv2image))
 
-        self.CVHandles.append(self.canvas.create_image(0, 0, image=self.imagetk, anchor="nw"))
-        self.CVHandles.append(self.canvas.create_image(1920, 1080, image=self.imagetk2, anchor="se"))
-        self.CVHandles.append(self.canvas.create_image(0, 1080, image=self.imagetk3, anchor="sw"))
+        self.CVHandles.append(self.canvas.create_image(0, 0, image=self.imagetk,
+                              anchor="nw"))
+        self.CVHandles.append(self.canvas.create_image(1920, 1080,
+                              image=self.imagetk2, anchor="se"))
+        self.CVHandles.append(self.canvas.create_image(0, 1080,
+                              image=self.imagetk3, anchor="sw"))
 
-        self.CVHandles.append(self.canvas.create_text(1920, 0, text=self.gp.lastAction, anchor="ne", font = "15"))
-        self.CVHandles.append(self.canvas.create_text(1920, 20, text="Distance: " + str(round(self.gp.handDistance, 3)), anchor="ne", font = "15"))
-        self.CVHandles.append(self.canvas.create_text(1920, 40, text=str(self.gp.getScaledCenter()), anchor = "ne", font = "15"))
+        self.CVHandles.append(self.canvas.create_text(1920, 0,
+                              text=self.gp.lastAction, anchor="ne",
+                              font="15"))
+        self.CVHandles.append(self.canvas.create_text(1920, 20,
+                              text="Distance: " + str(round(
+                                                      self.gp.handDistance, 3)),
+                              anchor="ne", font="15"))
+        self.CVHandles.append(self.canvas.create_text(1920, 40,
+                              text=str(self.gp.getScaledCenter()),
+                              anchor="ne", font="15"))
 
     def drawBG(self):
-        self.bgHandle = self.canvas.create_rectangle(self.width/2, 0, self.width, self.height/2, fill = "white")
+        self.bgHandle = self.canvas.create_rectangle(self.width/2, 0,
+                                                     self.width, self.height/2,
+                                                     fill="white")
 
     def redrawAll(self):
         self.drawCVImages()
@@ -158,6 +201,6 @@ class GestureDemo(EventBasedAnimationClass):
         self.onClose()
 
     def onClose(self):
-        self.gp.close() # MUST DO THIS
+        self.gp.close()  # MUST DO THIS
 
 GestureDemo().run()

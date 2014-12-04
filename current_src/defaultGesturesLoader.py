@@ -48,8 +48,10 @@ def makeInfinity():
     pointCount = 256
     lemniscatePoints = [(
         ((scale * math.sqrt(2) * math.cos(t)) / (math.sin(t) ** 2 + 1)),
-        - ((scale * math.sqrt(2) * math.cos(t) * math.sin(t)) / (math.sin(t) ** 2 + 1)))
-        for t in np.linspace(math.pi/2, 2 * math.pi + math.pi/2, num=pointCount)]
+        - ((scale * math.sqrt(2) * math.cos(t) * math.sin(t)) /
+            (math.sin(t) ** 2 + 1)))
+        for t in np.linspace(math.pi/2, 2 * math.pi + math.pi/2,
+                             num=pointCount)]
     infinity = Gesture(lemniscatePoints, name="Infinity")
     defaultGestures.append(infinity)
 

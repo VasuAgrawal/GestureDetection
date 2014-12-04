@@ -25,7 +25,8 @@ class Gesture(object):
     def curveLength(points):
         distance = 0
         for i in xrange(len(points)-1):
-            distance += (abs(points[i][0] - points[i+1][0]) ** 2 + abs(points[i][1] - points[i+1][1]) ** 2) ** 0.5
+            distance += (abs(points[i][0] - points[i+1][0]) ** 2 +
+                         abs(points[i][1] - points[i+1][1]) ** 2) ** 0.5
         return distance
 
     @staticmethod
@@ -34,7 +35,8 @@ class Gesture(object):
 
     @staticmethod
     def maxDim(points):
-        xMin, xMax, yMin, yMax = sys.maxsize, -sys.maxsize, sys.maxsize, -sys.maxsize
+        xMin, xMax, yMin, yMax = (sys.maxsize, -sys.maxsize,
+                                  sys.maxsize, -sys.maxsize)
         for x, y in points:
             if abs(x) < xMin: xMin = abs(x)
             if abs(x) > xMax: xMax = abs(x)
@@ -57,13 +59,15 @@ class Gesture(object):
 
     @staticmethod
     def distance(point1, point2):
-        return ((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2) ** 0.5
+        return ((point1[0] - point2[0]) ** 2 +
+                (point1[1] - point2[1]) ** 2) ** 0.5
 
     @staticmethod
     def compareGestures(template, humanGesture):
         def findIndices(templateDistance):
             if templateDistance > template.distanceIndices[-1]:
-                return len(template.distanceIndices) - 2, len(template.distanceIndices) - 1
+                return (len(template.distanceIndices) - 2,
+                        len(template.distanceIndices) - 1)
             elif templateDistance < template.distanceIndices[0]:
                 return 0, 1
             start = 0
